@@ -10,4 +10,5 @@
 #include <GL/glew.h>
 #include "GLFW/glfw3.h"
 
-void HandleInputs(camera *Camera, GLFWwindow *Window, r32 dt);
+void HandleKeyInputs(camera *Camera, GLFWwindow *Window, r32 dt);
+void HandleMouseInputs(camera *Camera, GLFWwindow *Window);

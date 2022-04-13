@@ -26,14 +26,14 @@ get_file_contents(const char *filename)
         return (contents);
     }
 
-    throw (errno);
+    throw(errno);
 }
 
 static void
 compileErrors(u32 shader, const char *type)
 {
     // Stores status of compilation
-    s32  hasCompiled;
+    s32 hasCompiled;
     // Character array to store error message in
     char infoLog[1024];
     if (type != "PROGRAM")
@@ -57,8 +57,8 @@ compileErrors(u32 shader, const char *type)
     }
 }
 
-static u32
-createShaders(const char *vertexFile, const char *fragmentFile)
+_global u32
+CreateShaders(const char *vertexFile, const char *fragmentFile, const char *geometryPath = nullptr)
 {
     std::string vertexCode   = get_file_contents(vertexFile);
     std::string fragmentCode = get_file_contents(fragmentFile);
@@ -76,10 +76,27 @@ createShaders(const char *vertexFile, const char *fragmentFile)
     glCompileShader(fragmentShader);
     compileErrors(fragmentShader, "FRAGMENT");
 
+    unsigned int geometryShader;
+    if (geometryPath != nullptr)
+    {
+        std::string geometryCode = get_file_contents(geometryPath);
+        const char *geometrySource = geometryCode.c_str();
+        
+        geometryShader          = glCreateShader(GL_GEOMETRY_SHADER);
+        glShaderSource(geometryShader, 1, &geometrySource, NULL);
+        glCompileShader(geometryShader);
+        compileErrors(geometryShader, "GEOMETRY");
+    }
+
     u32 program = glCreateProgram();
 
     glAttachShader(program, vertexShader);
     glAttachShader(program, fragmentShader);
+
+    if (geometryPath != nullptr)
+    {
+        glAttachShader(program, geometryShader);
+    }
 
     glLinkProgram(program);
     compileErrors(program, "PROGRAM");

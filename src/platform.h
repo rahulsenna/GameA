@@ -21,9 +21,9 @@ typedef bool    b32;
 typedef float  r32;
 typedef double r64;
 
-_global const int WIDTH         = 1920;
-_global const int HEIGHT        = 1080;
-_global b32 GlobalRunning = true;
+#define WIDTH  (1920 / 1)
+#define HEIGHT (1080 / 1)
+
 
 #define FACE_CULLING
 
@@ -43,8 +43,8 @@ using std::string, std::cout, std::endl;
 struct texture
 {
     const char *type;
-    s32        unit;
-    u32        ID;
+    s32         unit;
+    u32         ID;
 };
 
 #define MAX_BONE_INFLUENCE 4
@@ -68,7 +68,7 @@ struct Vertex
 struct FileData
 {
     size_t size;
-    void   *data;
+    void  *data;
 };
 
 _internal void WriteToFile(const char *Filename, void *Data, size_t Size)
@@ -102,7 +102,7 @@ Lerp(r32 A, r32 t, r32 B)
 }
 
 _internal glm::vec3
-Lerp(glm::vec3 x, glm::vec3 y, r32 t)
+          Lerp(glm::vec3 x, glm::vec3 y, r32 t)
 {
     return x * (1.f - t) + y * t;
 }

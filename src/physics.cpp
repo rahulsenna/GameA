@@ -29,7 +29,7 @@ void InitPhysics()
 
     FoundationPhysX = PxCreateFoundation(PX_PHYSICS_VERSION, gAllocator, gErrorCallback);
 
-    PvdPhysX = PxCreatePvd(*FoundationPhysX);
+    PvdPhysX                  = PxCreatePvd(*FoundationPhysX);
     PxPvdTransport *transport = PxDefaultPvdSocketTransportCreate(PVD_HOST, 5425, 10);
     PvdPhysX->connect(*transport, PxPvdInstrumentationFlag::eALL);
 
@@ -38,16 +38,20 @@ void InitPhysics()
     // Cooking
     CookingPhysX = PxCreateCooking(PX_PHYSICS_VERSION, *FoundationPhysX, PxCookingParams(PxTolerancesScale()));
     if (!CookingPhysX)
-    { return; }
+    {
+        return;
+    }
 
     //Cooking End
 
     PxSceneDesc sceneDesc(PhysXSDK->getTolerancesScale());
-    sceneDesc.gravity = PxVec3(0.0f, -9.81f*9.81f, 0.0f);
-    DispatcherPhysX = PxDefaultCpuDispatcherCreate(2);
+    sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;
+
+    sceneDesc.gravity       = PxVec3(0.0f, -9.81f, 0.0f);
+    DispatcherPhysX         = PxDefaultCpuDispatcherCreate(2);
     sceneDesc.cpuDispatcher = DispatcherPhysX;
     sceneDesc.filterShader  = PxDefaultSimulationFilterShader;
-    ScenePhysX = PhysXSDK->createScene(sceneDesc);
+    ScenePhysX              = PhysXSDK->createScene(sceneDesc);
     ScenePhysX->setVisualizationParameter(PxVisualizationParameter::eSCALE, 1);
     ScenePhysX->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1);
 
@@ -67,9 +71,10 @@ void InitPhysics()
     DefaultMaterialPhysX = PhysXSDK->createMaterial(0.5f, 0.5f, 0.6f);
 }
 
-void StepPhysics()
+void StepPhysics(r32 dt)
 {
-    ScenePhysX->simulate(1.0f / 60.0f);
+    ScenePhysX->simulate(1.0f / 30.0f);
+    // ScenePhysX->simulate(dt);
     ScenePhysX->fetchResults(true);
 }
 
@@ -92,7 +97,7 @@ PX_INLINE void addForceAtPosInternal(PxRigidBody &body, const PxVec3 &force, con
 {
     /*  if(mode == PxForceMode::eACCELERATION || mode == PxForceMode::eVELOCITY_CHANGE)
     {
-        Ps::getFoundation().error(PxErrorCode::eINVALID_PARAMETER, __FILE__, __LINE__,
+        Ps::getFoundation().error(PxErrorCode::eINVALID_PARAMETER, __FILE__, __LINwwwwwww_,
             "PxRigidBodyExt::addForce methods do not support eACCELERATION or eVELOCITY_CHANGE modes");
         return;
     }*/
@@ -139,7 +144,7 @@ void defaultCCTInteraction(const PxControllerShapeHit &hit)
                 const PxF32  dp       = hit.dir.dot(upVector);
                 //      shdfnd::printFormatted("%f\n", fabsf(dp));
                 if (fabsf(dp) < 1e-3f)
-                    //      if(hit.dir.y==0.0f)
+                //      if(hit.dir.y==0.0f)
                 {
                     const PxTransform globalPose = actor->getGlobalPose();
                     const PxVec3      localPos   = globalPose.transformInv(newHit.position);
@@ -155,7 +160,7 @@ void defaultCCTInteraction(const PxControllerShapeHit &hit)
         const PxF32  dp       = hit.dir.dot(upVector);
         //      shdfnd::printFormatted("%f\n", fabsf(dp));
         if (fabsf(dp) < 1e-3f)
-            //      if(hit.dir.y==0.0f)
+        //      if(hit.dir.y==0.0f)
         {
             const PxTransform globalPose = actor->getGlobalPose();
             const PxVec3      localPos   = globalPose.transformInv(toVec3(hit.worldPos));
@@ -189,7 +194,6 @@ PxController *CreatePhysXCCT()
 {
     PxControllerManager *CctManagerPhysX;
     PxController        *CCT_PhysX;
-
 
     // CCT Setup
 
@@ -225,7 +229,7 @@ PxController *CreatePhysXCCT()
     CapsuleControllerDesc.climbingMode = PxCapsuleClimbingMode::eCONSTRAINED;
 
     PxControllerDesc *ControllerDesc;
-    ControllerDesc = &CapsuleControllerDesc;
+    ControllerDesc                      = &CapsuleControllerDesc;
     ControllerDesc->density             = ControlledActorDesc.ProxyDensity;
     ControllerDesc->scaleCoeff          = ControlledActorDesc.ProxyScale;
     ControllerDesc->material            = DefaultMaterialPhysX;
@@ -236,12 +240,12 @@ PxController *CreatePhysXCCT()
     ControllerDesc->invisibleWallHeight = ControlledActorDesc.InvisibleWallHeight;
     ControllerDesc->maxJumpHeight       = ControlledActorDesc.MaxJumpHeight;
     // ControllerDesc->nonWalkableMode      = PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
-    ControllerDesc->reportCallback      = ControlledActorDesc.ReportCallback;
+    ControllerDesc->reportCallback = ControlledActorDesc.ReportCallback;
     // ControllerDesc->behaviorCallback = desc.BehaviorCallback;
     // ControllerDesc->volumeGrowth     = desc.VolumeGrowth;
 
-    CctManagerPhysX = PxCreateControllerManager(*ScenePhysX);
-    CCT_PhysX       = static_cast<PxBoxController *>(CctManagerPhysX->createController(*ControllerDesc));
+    CctManagerPhysX               = PxCreateControllerManager(*ScenePhysX);
+    CCT_PhysX                     = static_cast<PxBoxController *>(CctManagerPhysX->createController(*ControllerDesc));
     PxRigidDynamic *CctActorPhysX = CCT_PhysX->getActor();
 
     if (CctActorPhysX)
@@ -264,8 +268,8 @@ void RenderPhysXDebug(u32 ShaderID, vec4 Color)
     SetVec4Uniform("Color", Color, ShaderID);
 
     const PxRenderBuffer &Buffer = ScenePhysX->getRenderBuffer();
-    std::vector<PxVec3>  Vertices;
-    for (PxU32           I       = 0; I < Buffer.getNbLines(); I++)
+    std::vector<PxVec3>   Vertices;
+    for (PxU32 I = 0; I < Buffer.getNbLines(); I++)
     {
         const PxDebugLine &line = Buffer.getLines()[I];
         // render the line
@@ -384,7 +388,6 @@ void setupCommonCookingParams(PxCookingParams &params, bool skipMeshCleanup, boo
     else
         params.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_ACTIVE_EDGES_PRECOMPUTE;
 }
-
 
 // Creates a triangle mesh using BVH34 midphase with different settings.
 PxTriangleMesh *createBV34TriangleMesh(const char *Filename,

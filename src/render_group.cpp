@@ -5,7 +5,7 @@
 #include "render_group.h"
 #include "shader.h"
 
-extern b32     PhysXDebug;
+extern b32      PhysXDebug;
 extern PxScene *ScenePhysX;
 extern ImGuiIO *ImGuiIo;
 
@@ -22,8 +22,9 @@ void InitImGUI(GLFWwindow *Window)
     ImGuiIo = &io;
 }
 
-extern r32          PercentageCloserFilter;
-extern debug_camera DebugCamera;
+extern r32              PercentageCloserFilter;
+extern debug_camera     DebugCamera;
+extern bloom_properties Bloom;
 
 void RenderImGui(r32 dt)
 {
@@ -45,13 +46,16 @@ void RenderImGui(r32 dt)
     ImGui::Begin("DebugCamera");
     ImGui::Checkbox("Enable", &DebugCamera.Enable);
     ImGui::Checkbox("ShadowsBox", &DebugCamera.EnableShadowBox);
-    ImGui::Checkbox("ShadowsBox", &DebugCamera.EnableShadowBox);
 
     ImGui::InputFloat3("Position", &DebugCamera.Pos.x);
     ImGui::SliderFloat2("Rotation", &DebugCamera.Rot.x, -1.f, 1.f);
     ImGui::SliderFloat("Zoom", &DebugCamera.Zoom, 0.9f, 1.1f);
-
     ImGui::Checkbox("PhysXDebug", &PhysXDebug);
+    ImGui::End();
+
+    ImGui::Begin("Bloom");
+    ImGui::Checkbox("Enable", &Bloom.Enable);
+    ImGui::InputFloat("Exposure", &Bloom.exposure);
 
     ImGui::End();
 
@@ -119,9 +123,9 @@ mat4 CalculateLightSpaceMatrix(camera *Camera)
         DebugFrustumView[i] /= DebugFrustumView[i].w;
     }
 
-    vec3              min = {INFINITY, INFINITY, INFINITY};
-    vec3              max = {-INFINITY, -INFINITY, -INFINITY};
-    for (unsigned int i   = 0; i < NDC.size(); i++)
+    vec3 min = {INFINITY, INFINITY, INFINITY};
+    vec3 max = {-INFINITY, -INFINITY, -INFINITY};
+    for (unsigned int i = 0; i < NDC.size(); i++)
     {
         if (NDC[i].x < min.x)
             min.x = NDC[i].x;
@@ -212,7 +216,10 @@ shadow_map SetupShadowMapTexture(s32 Width, s32 Height)
     return Result;
 }
 
-void RenderPassShadow(mat4 &LightSpaceMatrix, render_group_shape &GroupShape, dynamic_model_render_group &DynamicModelRenderGroup, shadow_map &ShadowMap)
+void RenderPassShadow(mat4                       &LightSpaceMatrix,
+                      render_group_shape         &GroupShape,
+                      dynamic_model_render_group &DynamicModelRenderGroup,
+                      shadow_map                 &ShadowMap)
 {
     glViewport(0, 0, ShadowMap.Width, ShadowMap.Height);
     glBindFramebuffer(GL_FRAMEBUFFER, ShadowMap.FBO);
@@ -244,14 +251,14 @@ mat4 DebugViewMatrix(debug_camera *Camera)
     Camera->Pos  = vec3(glm::scale(mat4(1.f), vec3(Camera->Zoom)) * vec4(Camera->Pos, 1.f));
     Camera->Zoom = 1;
     Camera->Rot  = vec2(0);
-    View = lookAt(Camera->Pos, vec3(0), vec3(0, 1, 0));
+    View         = lookAt(Camera->Pos, vec3(0), vec3(0, 1, 0));
     return View;
 }
 
 void RenderDebugCamera(u32 &ShaderID, mat4 &Projection, mat4 &View)
 {// LIGHT POS DEBUG == SUN
-// SetMat4Uniform("model", mat4(1), DebugLineShader);
-// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // SetMat4Uniform("model", mat4(1), DebugLineShader);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     glUseProgram(ShaderID);
     SetMat4Uniform("projection", Projection, ShaderID);
@@ -319,7 +326,7 @@ void PhysXDebugRender(u32 &ShaderID, mat4 &Projection, mat4 &View)
     SetVec4Uniform("Color", vec4(0, 1, 0, 1), ShaderID);
 
     const PxRenderBuffer &Buffer = ScenePhysX->getRenderBuffer();
-    std::vector<PxVec3>  Vertices;
+    std::vector<PxVec3>   Vertices;
 
     for (PxU32 I = 0; I < Buffer.getNbLines(); I++)
     {
@@ -336,4 +343,124 @@ void PhysXDebugRender(u32 &ShaderID, mat4 &Projection, mat4 &View)
     glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(PxVec3), Vertices.data(), GL_DYNAMIC_DRAW);
     linkAttrib(VBO, 0, 3, GL_FLOAT, 1 * sizeof(PxVec3), (void *) 0);
     glDrawArrays(GL_LINES, 0, Vertices.size());
+}
+
+bloom_properties SetupBloom()
+{
+    bloom_properties Bloom;
+    Bloom.BloomShader = CreateShaders("../shaders/post_processing/bloom.vert", "../shaders/post_processing/bloom.frag");
+    Bloom.BlurShader  = CreateShaders("../shaders/post_processing/blur.vert", "../shaders/post_processing/blur.frag");
+
+    // configure (floating point) framebuffers
+    // ---------------------------------------
+
+    glGenFramebuffers(1, &Bloom.FBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, Bloom.FBO);
+    // create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
+
+    glGenTextures(2, Bloom.colorBuffers);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindTexture(GL_TEXTURE_2D, Bloom.colorBuffers[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // attach texture to framebuffer
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, Bloom.colorBuffers[i], 0);
+    }
+    // create and attach depth buffer (renderbuffer)
+
+    glGenRenderbuffers(1, &Bloom.rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, Bloom.rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, Bloom.rboDepth);
+    // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
+    u32 attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
+    // finally check if framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        ;
+    std::cout << "Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // ping-pong-framebuffer for blurring
+
+    glGenFramebuffers(2, Bloom.pingpongFBO);
+    glGenTextures(2, Bloom.pingpongColorbuffers);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, Bloom.pingpongFBO[i]);
+        glBindTexture(GL_TEXTURE_2D, Bloom.pingpongColorbuffers[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Bloom.pingpongColorbuffers[i], 0);
+        // also check if framebuffers are complete (no need for depth buffer)
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "Framebuffer not complete!" << std::endl;
+    }
+
+    glUseProgram(Bloom.BlurShader);
+    SetTextUniform("image", 0, Bloom.BlurShader);
+
+    glUseProgram(Bloom.BloomShader);
+    SetTextUniform("scene", 0, Bloom.BloomShader);
+    SetTextUniform("bloomBlur", 1, Bloom.BloomShader);
+
+    return Bloom;
+}
+
+void RenderBloom(shape *Quad)
+{
+#if 1
+    // 2. blur bright fragments with two-pass Gaussian Blur
+    // --------------------------------------------------
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    bool         horizontal = true, first_iteration = true;
+    unsigned int amount = 10;
+    glUseProgram(Bloom.BlurShader);
+
+    for (unsigned int i = 0; i < amount; i++)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, Bloom.pingpongFBO[horizontal]);
+        SetIntUniform("horizontal", horizontal, Bloom.BlurShader);
+        glBindTexture(GL_TEXTURE_2D,
+                      first_iteration ? Bloom.colorBuffers[1] : Bloom.pingpongColorbuffers[!horizontal]);
+        // bind texture of other framebuffer (or scene if first iteration)
+        RenderShape(Quad);
+
+        horizontal = !horizontal;
+        if (first_iteration)
+            first_iteration = false;
+    }
+#endif
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //
+    // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer'
+    // s (clamped) color range
+    // ----------------------------------------------------------------------------------------------------
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUseProgram(Bloom.BloomShader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, Bloom.colorBuffers[0]);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, Bloom.pingpongColorbuffers[!horizontal]);
+    // glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[0]);
+
+    SetIntUniform("bloom", Bloom.Enable, Bloom.BloomShader);
+    SetFloatUniform("exposure", Bloom.exposure, Bloom.BloomShader);
+
+    RenderShape(Quad);
 }

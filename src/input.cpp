@@ -13,7 +13,7 @@ b32 CamPosByTig         = false;
 b32 InputDependent      = true;
 b32 CamRotationByMatrix = true;
 
-float LookAtX = 1.f;
+r32 LookAtX = 1.f;
 
 extern PxController *MainCCT;
 
@@ -29,15 +29,15 @@ void UpdateCamera(camera *Camera)
     r32 yaw   = glm::radians(Camera->y);
     r32 pitch = glm::radians(Camera->p);
 
-//    vec3 PlayerPos = Camera->target->Position + AddPlayerCam;
+    //    vec3 PlayerPos = Camera->target->Position + AddPlayerCam;
     vec3 PlayerPos = V3PxVec3(MainCCT->getPosition()) + AddPlayerCam;
 
     vec3 distanceOffset = Camera->DistanceOffset;
 
     // if (pitch < 0.f) { pitch = 0.f; }
     {
-        glm::quat qx = glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f));
-        glm::quat qy = glm::angleAxis(-pitch, glm::vec3(1.f, 0.f, 0.f));
+        glm::quat qx   = glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f));
+        glm::quat qy   = glm::angleAxis(-pitch, glm::vec3(1.f, 0.f, 0.f));
         distanceOffset = distanceOffset * qy;
         distanceOffset = distanceOffset * qx;
 
@@ -48,13 +48,13 @@ void UpdateCamera(camera *Camera)
     }
     distanceOffset = PlayerPos + distanceOffset;
 
-//    if (Camera->target->AnimState != Fall)
-//    {
-//        distanceOffset = PlayerPos + distanceOffset;
-//    } else
-//    {
-//        distanceOffset.z = PlayerPos.z;
-//    }
+    //    if (Camera->target->AnimState != Fall)
+    //    {
+    //        distanceOffset = PlayerPos + distanceOffset;
+    //    } else
+    //    {
+    //        distanceOffset.z = PlayerPos.z;
+    //    }
     // camera->tpCamPos = glm::mix(camera->tpCamPos+ADDCamPos, distanceOffset, t);
     Camera->ThirdPCamPos = ADDCamPos + distanceOffset;
 
@@ -99,26 +99,75 @@ void UpdateCamera(camera *Camera)
 #endif
 }
 
-static int scroll;
+static s32 scroll;
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    scroll = yoffset;
+    scroll = (s32)yoffset;
 }
 
-float LastMouseX, LastMouseY = 0.f;
-float camYaw;
+r32 LastMouseX, LastMouseY = 0.f;
+r32 camYaw;
 
 extern PxScene *ScenePhysX;
 
-PxObstacleContext         *ObstacleContext  = NULL;
+PxObstacleContext        *ObstacleContext   = NULL;
 const PxControllerFilters ControllerFilters = PxControllerFilters();
 
 extern player Player;
 
-void HandleInputs(camera *Camera, GLFWwindow *Window, r32 dt)
+void HandleMouseInputs(camera *Camera, GLFWwindow *Window)
 {
-    float velocity = dt * Camera->MovementSpeed * 12.f;
+
+    // Mouse
+    if (glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
+        glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
+        r64 mouseX, mouseY;
+        glfwGetCursorPos(Window, &mouseX, &mouseY);
+
+        if (Camera->FirstClick)
+        {
+            LastMouseX         = (r32)mouseX;
+            LastMouseY         = (r32)mouseY;
+            Camera->FirstClick = false;
+        }
+
+        r32 xoffset = mouseX - LastMouseX;
+        r32 yoffset = LastMouseY - (r32)mouseY;// reversed since y-coordinates go from bottom to top
+
+        LastMouseX = mouseX;
+        LastMouseY = (r32)mouseY;
+
+        if (mouseX > (r32) WIDTH)
+        {
+            glfwSetCursorPos(Window, (r32) WIDTH, mouseY);
+            LastMouseX = (r32) WIDTH;
+        }
+        // if (mouseY > (r32) HEIGHT)
+        // {
+        //     glfwSetCursorPos(Window, mouseX, (r32) HEIGHT);
+        //     LastMouseX = (r32) HEIGHT;
+        // }
+
+        xoffset *= Camera->MouseSensitivity;
+        yoffset *= Camera->MouseSensitivity;
+        Camera->Yaw += xoffset;
+        Camera->Pitch += yoffset;
+    }
+
+    if ((glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) &&
+        glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
+    {
+        glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        Camera->FirstClick = true;
+    }
+}
+
+void HandleKeyInputs(camera *Camera, GLFWwindow *Window, r32 dt)
+{
+    r32 velocity = dt * Camera->MovementSpeed * 12.f;
 
     if (scroll == -1)
     {
@@ -170,53 +219,20 @@ void HandleInputs(camera *Camera, GLFWwindow *Window, r32 dt)
         Camera->MovementSpeed = 1.f;
     }
 
-    // Mouse
-    if (glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-    {
-        glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-
-        double mouseX, mouseY;
-        glfwGetCursorPos(Window, &mouseX, &mouseY);
-
-        if (Camera->FirstClick)
-        {
-            LastMouseX = mouseX;
-            LastMouseY = mouseY;
-            Camera->FirstClick = false;
-        }
-
-        float xoffset = mouseX - LastMouseX;
-        float yoffset = LastMouseY - mouseY;// reversed since y-coordinates go from bottom to top
-
-        LastMouseX = mouseX;
-        LastMouseY = mouseY;
-
-        xoffset *= Camera->MouseSensitivity;
-        yoffset *= Camera->MouseSensitivity;
-        Camera->Yaw += xoffset;
-        Camera->Pitch += yoffset;
-    }
-
-    if ((glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) &&
-        glfwGetMouseButton(Window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
-    {
-        glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        Camera->FirstClick = true;
-    }
-
-    PxVec3 Displacement = ScenePhysX->getGravity() * dt;
+    PxVec3 Displacement = ScenePhysX->getGravity() * dt * 12;
     //Walk
     if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        Displacement.x   = velocity * Camera->Front.x;
-        Displacement.z   = velocity * Camera->Front.z;
+        Displacement.x = velocity * Camera->Front.x;
+        Displacement.z = velocity * Camera->Front.z;
 
         // camera->target->Position += velocity * glm::vec3(camera->Front.x, 0.f, camera->Front.z);
-        float A = -Camera->y;
+        r32 A = -Camera->y;
 
-        if ((A - Player.RotateX)  > 360 || (A - Player.RotateX)  < -360)
-        {    Camera->Yaw = ((int)Camera->Yaw % 360);
-            Player.RotateX = ((int)Player.RotateX % 360);
+        if ((A - Player.RotateX) > 360 || (A - Player.RotateX) < -360)
+        {
+            Camera->Yaw    = ((int) Camera->Yaw % 360);
+            Player.RotateX = ((int) Player.RotateX % 360);
         };
 
         if (glfwGetKey(Window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
@@ -230,12 +246,11 @@ void HandleInputs(camera *Camera, GLFWwindow *Window, r32 dt)
             Player.AnimState = Walk;
             Player.RotateX   = glm::mix(Player.RotateX, A, 0.01f);
         }
-
     }
     if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        Displacement.x = -velocity * Camera->Front.x;
-        Displacement.z = -velocity * Camera->Front.z;
+        Displacement.x   = -velocity * Camera->Front.x;
+        Displacement.z   = -velocity * Camera->Front.z;
         Player.AnimState = WalkBack;
     }
 

@@ -23,6 +23,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
+
     GLFWwindow *Window = glfwCreateWindow(WIDTH, HEIGHT, "Learn OpenGL", 0, 0);
     if (Window == NULL)
     {
@@ -34,7 +35,9 @@ int main()
 
     GLFWmonitor *monitor = glfwGetWindowMonitor(Window);
     // glfwSetWindowMonitor(window, monitor, 0, 0, 2560, 1440, 240);
-    glfwSetWindowSize(Window, 2560, 1440);
+    // glfwSetWindowSize(Window, 2560, 1440);
+    glfwSetWindowSize(Window, WIDTH, HEIGHT);
+
     glfwSetWindowPos(Window, 5, 70);
 
     glfwSetScrollCallback(Window, scroll_callback);
@@ -44,13 +47,15 @@ int main()
     stbi_set_flip_vertically_on_load(true);
 
     char *IconFile = "C:/Users/AgentOfChaos/Desktop/models/textures/right.png";
-    Icon.pixels = stbi_load(IconFile, &Icon.width, &Icon.height, &NumColCh, 0);
+    Icon.pixels    = stbi_load(IconFile, &Icon.width, &Icon.height, &NumColCh, 0);
 
     glfwSetWindowIcon(Window, 1, &Icon);
 
-//    gladLoadGL();
+    //    gladLoadGL();
     if (glewInit() != GLEW_OK)
-    { std::cout << "Error!" << std::endl; }
+    {
+        std::cout << "Error!" << std::endl;
+    }
 
     glViewport(0, 0, WIDTH, HEIGHT);
 
@@ -70,6 +75,7 @@ int main()
     glFrontFace(GL_CW);
     // glFrontFace(GL_CCW);
 #endif
+    glLineWidth(3);
 
     InitGame(Window);
 
@@ -77,8 +83,6 @@ int main()
     {
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-        glDrawArrays(GL_LINES, 0, 2);
 
         UpdateAndRender(Window);
 

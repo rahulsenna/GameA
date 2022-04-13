@@ -61,7 +61,7 @@ shape CreateFrustum(std::vector<vec4> &f)
         3,2,6      
     };
     // clang-format on
-    std::vector<float>        normals(vertices.size(), 1);
+    std::vector<float> normals(vertices.size(), 1);
 
     uploadToGPU(&box, vertices, indices, normals);
     return (box);
@@ -112,7 +112,7 @@ shape CreateBoxMinMax(float minX, float maxX, float minY, float maxY, float minZ
         3,2,6      
     };
     // clang-format on
-    std::vector<float>        normals(vertices.size(), 1);
+    std::vector<float> normals(vertices.size(), 1);
 
     uploadToGPU(&box, vertices, indices, normals);
     return (box);
@@ -164,7 +164,7 @@ shape createBox(float w, float h, float l)
 	    3,2,6      
 	};
     // clang-format on
-    std::vector<float>        normals(vertices.size(), 1);
+    std::vector<float> normals(vertices.size(), 1);
 
     uploadToGPU(&box, vertices, indices, normals);
     return (box);
@@ -217,7 +217,7 @@ std::vector<float> texCoords =
 
 shape createSphere(float rad, uint32_t hSegs, uint32_t vSegs)
 {
-    shape ball = {};
+    shape ball      = {};
     ball.numIndices = (hSegs * vSegs * 2) * 3;
 
     float dphi   = (float) (2.0 * M_PI) / (float) (hSegs);
@@ -282,7 +282,7 @@ shape createSphere(float rad, uint32_t hSegs, uint32_t vSegs)
 
 shape CreateSphere(float radius, unsigned int stackCount, unsigned int sectorCount)
 {
-    shape sphere = {};
+    shape sphere      = {};
     sphere.numIndices = (stackCount * sectorCount * 2) * 3;
 
     std::vector<float> vertices;
@@ -335,7 +335,7 @@ shape CreateSphere(float radius, unsigned int stackCount, unsigned int sectorCou
     std::vector<unsigned int> indices;
     std::vector<int>          lineIndices;
     int                       k1, k2;
-    for (int                  i = 0; i < stackCount; ++i)
+    for (int i = 0; i < stackCount; ++i)
     {
         k1 = i * (sectorCount + 1);// beginning of current stack
         k2 = k1 + sectorCount + 1; // beginning of next stack
@@ -535,11 +535,53 @@ shape CreateCubeTextured(r32 w, r32 h, r32 l)
     };
     // clang-format on
 
-
     shape box = {};
 
     box.numIndices = 36;
 
     uploadToGPU(&box, vertices, indices, normals, texCoords);
     return (box);
+}
+
+shape CreateQuad()
+{
+    // clang-format off
+    std::vector<r32> Vertices = 
+    {
+    -1.0f,  1.0f, 0.0f,
+    -1.0f, -1.0f, 0.0f,
+     1.0f, -1.0f, 0.0f,
+     1.0f,  1.0f, 0.0f,
+    };
+
+    std::vector<u32> Indices = 
+    {
+      1,2,0,
+      2,3,0,
+    };
+
+    std::vector<r32> TextCoords =
+    {
+     0.0f, 1.0f,
+     0.0f, 0.0f,
+     1.0f, 0.0f,
+     1.0f, 1.0f
+    };
+
+    std::vector<r32> Normals = 
+    {
+     0.0f,  1.0f, 0.0f,
+     0.0f,  1.0f, 0.0f,
+     0.0f,  1.0f, 0.0f,
+     0.0f,  1.0f, 0.0f,
+    };
+    // clang-format on
+
+    shape Quad = {};
+
+    Quad.numIndices = 6;
+
+    uploadToGPU(&Quad, Vertices, Indices, Normals, TextCoords);
+
+    return Quad;
 }

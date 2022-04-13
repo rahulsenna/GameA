@@ -1,0 +1,76 @@
+{
+
+	"settings":
+    {
+        "cmake":
+        {
+            "build_folder": "$folder/build",
+            "command_line_overrides":
+            {
+                "BUILD_SHARED_LIBS": true,
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+            },
+            "generator": "Ninja",
+            "windows":
+            {
+                "generator": "Ninja",
+                "platform": "x64",
+                "toolset": { "host": "x64", },
+            },
+        },
+        "SublimeLinter.linters.clangtidy.compile_commands": "${project_path}/build"
+
+    },
+
+	"folders":
+	[
+		{
+			"path": ".",
+		}
+	],
+
+	"build_systems": 
+	[
+		{
+			"cancel": 
+			{
+				"kill": true,
+			},
+			"name": "Build",
+			"file_regex": "^.*(^.*)\\((\\d*),(\\d*)\\)\\s*:\\s*(.*)",
+			"line_regex": "^.*\\((\\d*),(\\d*)\\)\\s*:\\s*(.*)",
+			"working_dir": "${project_path}",
+			"cmd": "${project_path}\\misc\\build.bat",
+			// "selector": "source.c++",
+		},
+
+		{
+			"file_regex": "^(.+)\\((\\d+)\\):() (.+)$",
+			"name": "meGame2 (Windows)",
+			"shell_cmd": "cmake --build .",
+			"syntax": "Packages/CMakeBuilder/Syntax/Ninja+CL.sublime-syntax",
+			"variants":
+			[
+				{
+					"name": "rebuild_cache",
+					"shell_cmd": "cmake --build . --target rebuild_cache"
+				},
+				{
+					"name": "meGame",
+					"shell_cmd": "cmake --build . --target meGame"
+				},
+				{
+					"name": "all",
+					"shell_cmd": "cmake --build . --target all"
+				},
+				{
+					"name": "clean",
+					"shell_cmd": "cmake --build . --target clean"
+				}
+			],
+			"working_dir": "$folder/build"
+		},
+	],
+
+}

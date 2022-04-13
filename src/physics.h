@@ -50,7 +50,7 @@ void InitPhysics();
 
 physics_engine *InitPhysicsEngine();
 
-void StepPhysics();
+void StepPhysics(r32 dt);
 
 void CleanupPhysics();
 

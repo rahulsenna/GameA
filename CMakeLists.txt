@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.18)
 project(meGame)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,7 +10,6 @@ add_compile_options(
         /MTd
         #        /Ox
         #        /diagnostics:caret
-
 )
 
 add_link_options(

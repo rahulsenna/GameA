@@ -71,14 +71,35 @@ struct debug_camera
     vec3              Min, Max;
 };
 
+struct bloom_properties
+{
+
+    u32 BloomShader;
+    u32 BlurShader;
+
+    u32 FBO;
+    u32 rboDepth;
+    u32 pingpongFBO[2];
+    u32 pingpongColorbuffers[2];
+    u32 colorBuffers[2];
+    u32 attachments[2];
+
+    b32 Enable          = false;
+    b32 bloomKeyPressed = false;
+    r32 exposure        = 1.0f;
+};
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
+bloom_properties SetupBloom();
+void RenderBloom(shape *Quad);
+
+
 void InitImGUI(GLFWwindow *Window);
 
 void RenderImGui(r32 dt);
-
 
 mat4 CalculateLightSpaceMatrix(camera *Camera);
 
