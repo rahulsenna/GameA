@@ -30,15 +30,22 @@ uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
+// const vec4 clip_plane = vec4(0,-1,0, -208);
+// const vec4 clip_plane = vec4(0,1,0, 255);
+uniform vec4 clip_plane;
 
 
 void main()
 {
-	
-	FragPos = vec3(model *  vec4(aPos, 1.0f));
+	vec4 FragPosV4 = model *  vec4(aPos, 1.0f);
+
+
+	FragPos = FragPosV4.xyz;
 	Normal = aNormal;
 	TexCoords =  aTex;
 	
+
+	gl_ClipDistance[0] = dot(FragPosV4, clip_plane);
 
     mat3 normalMatrix = transpose(inverse(mat3(model)));
     vec3 T = normalize(normalMatrix * aTangent);

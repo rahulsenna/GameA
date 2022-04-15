@@ -53,6 +53,12 @@ struct shadow_map
     s32 Height;
     u32 DepthMap;
     u32 FBO;
+
+    r32 FarPlane;
+    r32 NearPlane;
+
+    vec3 Up;
+
 };
 
 struct debug_camera
@@ -87,6 +93,42 @@ struct bloom_properties
     b32 Enable          = false;
     b32 bloomKeyPressed = false;
     r32 exposure        = 1.0f;
+
+    shape Quad;
+};
+
+struct water
+{
+    u32 Shader;
+    u32 ReflectFBO;
+    u32 RefractFBO;
+
+    s32 ReflectWidth;
+    s32 ReflectHeight;
+
+    s32 RefractWidth;
+    s32 RefractHeight;
+
+    r32 MoveFactor;
+
+    r32 Height;
+
+    shape Quad;
+
+    texture Reflection;
+    texture Refraction;
+    texture DUDV;
+    texture Normal;
+    texture DepthMap;
+
+    mat4 Tranformation;
+};
+
+struct cubemap
+{
+    shape Cube;
+    u32   ShaderID;
+    u32   Texture;
 };
 
 #include <imgui/imgui.h>
@@ -94,8 +136,7 @@ struct bloom_properties
 #include <imgui/imgui_impl_opengl3.h>
 
 bloom_properties SetupBloom();
-void RenderBloom(shape *Quad);
-
+void             RenderBloom();
 
 void InitImGUI(GLFWwindow *Window);
 
@@ -103,18 +144,23 @@ void RenderImGui(r32 dt);
 
 mat4 CalculateLightSpaceMatrix(camera *Camera);
 
-void RenderShapes(render_group_shape *Group, u32 ShaderID);
+void RenderShapes(render_group_shape *Group, u32 ShaderID);// Takes ShaderID becausue shadows pass also uses this function
 
 void RenderAnimatedModels(dynamic_model_render_group *Group, u32 ShaderID);
+void RenderStaticModels(static_model_render_group *Group);
 
-void RenderPassShadow(mat4 &LightSpaceMatrix, render_group_shape &GroupShape, dynamic_model_render_group &DynamicModelRenderGroup, shadow_map &ShadowMap);
+void RenderPassShadow(mat4 &LightSpaceMatrix, render_group_shape &GroupShape,
+                      dynamic_model_render_group &DynamicModelRenderGroup, shadow_map &ShadowMap);
 
 shadow_map SetupShadowMapTexture(s32 Width, s32 Height);
 
+cubemap CreateCubemap();
+void    RenderSkybox(cubemap &Cubemap, mat4 &view, vec4 &ClipPlane);
+
+water CreateWater();
+void  RenderWater(mat4 &Projection, mat4 &View, water &Water, vec3 &CamPos, r32 &dt);
+
 mat4 DebugViewMatrix(debug_camera *DebugCamera);
-
 void RenderSun(u32 &ShaderID, mat4 &Projection, mat4 &View, vec3 &Pos);
-
 void RenderDebugCamera(u32 &ShaderID, mat4 &Projection, mat4 &View);
-
 void PhysXDebugRender(u32 &ShaderID, mat4 &Projection, mat4 &View);

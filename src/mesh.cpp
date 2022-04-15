@@ -95,16 +95,12 @@ void DrawMeshGeneric(u32 ShaderID, u32 VAO, std::vector<texture> &textures, u32 
         }
 
         SetTextUniform((type + num).c_str(), textures[i].unit, ShaderID);
-        glActiveTexture(GL_TEXTURE0 + textures[i].unit);
-        glBindTexture(GL_TEXTURE_2D, textures[i].ID);
-
-        // bindTexture(&textures[i]);
+        BindTexture(textures[i]);
     }
 
     glDrawElements(GL_TRIANGLES, IndicesSize, GL_UNSIGNED_INT, 0);
 
     glBindVertexArray(0);
-    glActiveTexture(GL_TEXTURE0);
 }
 
 void drawMesh(mesh_data *mesh, u32 shader)

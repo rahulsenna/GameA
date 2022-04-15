@@ -7,6 +7,8 @@
 #include "animation.h"
 
 vec3 AddPlayerCam(0, 2, 0);
+// vec3 AddPlayerCam(0, 0, 0);
+
 vec3 ADDCamPos(0, 0, 0);
 
 b32 CamPosByTig         = false;
@@ -22,31 +24,37 @@ void UpdateCamera(camera *Camera)
     r32 t = 0.15f;
     if (InputDependent)
     {
-        Camera->p = Camera->Pitch + 30.f;
-        Camera->y = Camera->Yaw + 90.f;
+        Camera->Pitch = glm::clamp(Camera->Pitch, -40.f, 80.f);
+        Camera->p     = Camera->Pitch + 30.f;
+        Camera->y     = Camera->Yaw + 90.f;
     }
 
     r32 yaw   = glm::radians(Camera->y);
     r32 pitch = glm::radians(Camera->p);
 
-    //    vec3 PlayerPos = Camera->target->Position + AddPlayerCam;
-    vec3 PlayerPos = V3PxVec3(MainCCT->getPosition()) + AddPlayerCam;
+    vec3 DistanceOffset = Camera->DistanceOffset;
 
-    vec3 distanceOffset = Camera->DistanceOffset;
-
-    // if (pitch < 0.f) { pitch = 0.f; }
+    // -----------------------Quarternion---------------------------------
+#if 1
     {
         glm::quat qx   = glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f));
         glm::quat qy   = glm::angleAxis(-pitch, glm::vec3(1.f, 0.f, 0.f));
-        distanceOffset = distanceOffset * qy;
-        distanceOffset = distanceOffset * qx;
-
-        // mat4 m         = mat4(1.f);
-        // m              = rotate(m, -yaw, vec3(0.f, 1.f, 0.f));
-        // m              = rotate(m, pitch, vec3(1.f, 0.f, 0.f));
-        // distanceOffset = vec3(m * vec4(distanceOffset, 1.f));
+        DistanceOffset = DistanceOffset * qy;
+        DistanceOffset = DistanceOffset * qx;
     }
-    distanceOffset = PlayerPos + distanceOffset;
+#else
+    // --------------------Matrix Multliplication-------------------------
+    {
+        mat4 m         = mat4(1.f);
+        m              = rotate(m, -yaw, vec3(0.f, 1.f, 0.f));
+        m              = rotate(m, pitch, vec3(1.f, 0.f, 0.f));
+        distanceOffset = vec3(m * vec4(distanceOffset, 1.f));
+    };
+#endif
+
+    //    vec3 PlayerPos = Camera->target->Position + AddPlayerCam;
+    vec3 PlayerPos = V3PxVec3(MainCCT->getPosition()) + AddPlayerCam;
+    DistanceOffset = PlayerPos + DistanceOffset;
 
     //    if (Camera->target->AnimState != Fall)
     //    {
@@ -56,7 +64,7 @@ void UpdateCamera(camera *Camera)
     //        distanceOffset.z = PlayerPos.z;
     //    }
     // camera->tpCamPos = glm::mix(camera->tpCamPos+ADDCamPos, distanceOffset, t);
-    Camera->ThirdPCamPos = ADDCamPos + distanceOffset;
+    Camera->ThirdPCamPos = ADDCamPos + DistanceOffset;
 
     Camera->Front = glm::normalize((PlayerPos - Camera->ThirdPCamPos) * LookAtX);
     Camera->Right = glm::normalize(glm::cross(Camera->Front, Camera->WorldUp));
@@ -92,8 +100,6 @@ void UpdateCamera(camera *Camera)
             vec3 TargetPos = camera->target->Position + glm::vec3(-x, y, -z);
 
             camera->tpCamPos = TargetPos;
-
-
         }
 
 #endif
@@ -103,7 +109,7 @@ static s32 scroll;
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    scroll = (s32)yoffset;
+    scroll = (s32) yoffset;
 }
 
 r32 LastMouseX, LastMouseY = 0.f;
@@ -129,16 +135,16 @@ void HandleMouseInputs(camera *Camera, GLFWwindow *Window)
 
         if (Camera->FirstClick)
         {
-            LastMouseX         = (r32)mouseX;
-            LastMouseY         = (r32)mouseY;
+            LastMouseX         = (r32) mouseX;
+            LastMouseY         = (r32) mouseY;
             Camera->FirstClick = false;
         }
 
         r32 xoffset = mouseX - LastMouseX;
-        r32 yoffset = LastMouseY - (r32)mouseY;// reversed since y-coordinates go from bottom to top
+        r32 yoffset = LastMouseY - (r32) mouseY;// reversed since y-coordinates go from bottom to top
 
         LastMouseX = mouseX;
-        LastMouseY = (r32)mouseY;
+        LastMouseY = (r32) mouseY;
 
         if (mouseX > (r32) WIDTH)
         {

@@ -26,6 +26,16 @@ extern r32              PercentageCloserFilter;
 extern debug_camera     DebugCamera;
 extern bloom_properties Bloom;
 
+extern PxController *MainCCT;
+
+extern shadow_map ShadowMap;
+
+extern water Water;
+
+extern vec3 LightPos;
+extern vec4 LightColor;
+vec3        LightRotate(0);
+
 void RenderImGui(r32 dt)
 {
     ImGui_ImplOpenGL3_NewFrame();
@@ -35,8 +45,8 @@ void RenderImGui(r32 dt)
     std::string DeltaText = std::to_string(dt * 1000.0f);
     std::string FPSText   = std::to_string(1.f / dt);
     ImGui::Begin("Timing");
-    ImGui::Text("%s", DeltaText.c_str());
-    ImGui::Text("%s", FPSText.c_str());
+    ImGui::Text("%s ms", DeltaText.c_str());
+    ImGui::Text("%s FPS", FPSText.c_str());
     ImGui::End();
 
     ImGui::Begin("Shadows");
@@ -56,34 +66,61 @@ void RenderImGui(r32 dt)
     ImGui::Begin("Bloom");
     ImGui::Checkbox("Enable", &Bloom.Enable);
     ImGui::InputFloat("Exposure", &Bloom.exposure);
+    ImGui::End();
+
+    ImGui::Begin("Light");
+    ImGui::InputFloat3("Pos", &LightPos.x);
+    ImGui::ColorEdit4("Color", &LightColor.x);
+    ImGui::SliderFloat3("Rotation", &LightRotate.x, -1.f, 1.f);
+    ImGui::End();
+
+    ImGui::Begin("WaterMatrix");
+
+    // ImGui::SliderFloat("Depth", &WaterTranslate.y, -400, 1);
+
+    // ImGui::SliderFloat3("Position", &WaterTranslate.x, -550, 1000);
+    // ImGui::InputFloat3("Rotate", &WaterRotate.x);
+    // ImGui::SliderFloat3("Scale", &WaterScale.x, 100, 500);
+
+    glm::quat qx = glm::angleAxis(radians(LightRotate.x), glm::vec3(0.f, 1.f, 0.f));
+    glm::quat qy = glm::angleAxis(-radians(LightRotate.y), glm::vec3(1.f, 0.f, 0.f));
+    glm::quat qz = glm::angleAxis(-radians(LightRotate.z), glm::vec3(0.f, 0.f, 1.f));
+
+    LightPos = LightPos * qx;
+    LightPos = LightPos * qy;
+    LightPos = LightPos * qz;
+
+    LightRotate = vec3(0);
 
     ImGui::End();
+
+    // ImGui::Begin("WaterReflection");
+    // ImGui::Image((void *) (intptr_t) Water.Reflection.ID, ImVec2(704, 396));
+    // ImGui::End();
+    // ImGui::Begin("WaterRefraction");
+    // ImGui::Image((void *) (intptr_t) Water.Refraction.ID, ImVec2(704, 396));
+    // ImGui::End();
+
+    // ImGui::Begin("WaterDepth");
+    // ImGui::Image((void *) (intptr_t) WaterDepthMap.ID, ImVec2(704, 396));
+    // ImGui::Image((void *) (intptr_t) ShadowMap.DepthMap, ImVec2(704, 396));
+
+    // ImGui::End();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-extern r32  FOV;
-extern r32  AspectRatio;
-extern vec3 LightPos;
-extern r32  ShadowFarDist;
+extern r32 FOV;
+extern r32 AspectRatio;
 
-r32 FOV_Radians    = radians(FOV);
-r32 ShadowNearDist = 0.01f;
-
-r32 Hnear = 2 * tan(FOV_Radians / 2) * ShadowNearDist;
-r32 Wnear = Hnear * AspectRatio;
-r32 Hfar  = 2 * tan(FOV_Radians / 2) * ShadowFarDist;
-r32 Wfar  = Hfar * AspectRatio;
-
-vec3 ShadowUP(0, 1, 0);
-vec2 Zs(0);
+mat4 GetReflectionMatrix(camera &Camera);
 
 mat4 CalculateLightSpaceMatrix(camera *Camera)
 {
     // Shadow Map render PASS
-    mat4 LightView        = lookAt(normalize(LightPos), vec3(0, 0, 0), ShadowUP);
-    mat4 ShadowProjection = perspective(FOV_Radians, AspectRatio, ShadowNearDist, ShadowFarDist);
+    mat4 LightView        = lookAt(normalize(LightPos), vec3(0, 0, 0), ShadowMap.Up);
+    mat4 ShadowProjection = perspective(FOV, AspectRatio, ShadowMap.NearPlane, ShadowMap.FarPlane);
 
     mat4 inverseProjectViewMatrix = inverse(ShadowProjection * GetViewMatrix(Camera));
 
@@ -167,9 +204,7 @@ void RenderShapes(render_group_shape *Group, u32 ShaderID)
         SetMat4Uniform("model", ModelMatrix, ShaderID);
         SetVec4Uniform("Color", Group->Colors[I], ShaderID);
 
-        glActiveTexture(GL_TEXTURE0 + Group->Textures[I].unit);
-        glBindTexture(GL_TEXTURE_2D, Group->Textures[I].ID);
-
+        BindTexture(Group->Textures[I]);
         RenderShape(&Group->Shapes[I]);
     }
 }
@@ -189,26 +224,39 @@ void RenderAnimatedModels(dynamic_model_render_group *Group, u32 ShaderID)
         DrawModel(&Group->Models[I], ShaderID);
     }
 }
+void RenderStaticModels(static_model_render_group *Group)
+{
+    for (u32 I = 0; I < Group->Models.size(); ++I)
+    {
+        SetMat4Uniform("model", Group->Transforms[I], Group->ShaderID);
+        DrawModel(&Group->Models[I], Group->ShaderID);
+#if 0
+            if (DrawDebugTriangleMesh)
+                    {
+                        RenderPhysXMesh(Group->DebugVAO[I], DebugLineShader,
+                                        Group->DebugIndicesCount[I],
+                                        View, Projection, Group->Transforms[I]);
+                    }
+#endif
+    }
+}
 
 shadow_map SetupShadowMapTexture(s32 Width, s32 Height)
 {
     shadow_map Result = {Width, Height};
 
-    // Shadow map texture
-    glGenFramebuffers(1, &Result.FBO);
-    // create depth texture
-    glGenTextures(1, &Result.DepthMap);
-    glBindTexture(GL_TEXTURE_2D, Result.DepthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, Width, Height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    Result.FarPlane  = 200;
+    Result.NearPlane = 0.01f;
+    Result.Up        = vec3(0, 1, 0);
+
+    Result.FBO      = CreateFBO();
+    Result.DepthMap = DepthTextureAttachment(Width, Height);
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = {1.0, 1.0, 1.0, 1.0};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    r32 BorderColor[] = {1.0, 1.0, 1.0, 1.0};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, BorderColor);
     // attach depth texture as FBO's depth buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, Result.FBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Result.DepthMap, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -231,7 +279,6 @@ void RenderPassShadow(mat4                       &LightSpaceMatrix,
 
     glUseProgram(DynamicModelRenderGroup.ShadowShaderID);
     SetMat4Uniform("lightSpaceMatrix", LightSpaceMatrix, DynamicModelRenderGroup.ShadowShaderID);
-
     RenderAnimatedModels(&DynamicModelRenderGroup, DynamicModelRenderGroup.ShadowShaderID);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -300,6 +347,7 @@ void RenderDebugCamera(u32 &ShaderID, mat4 &Projection, mat4 &View)
     SetVec4Uniform("Color", vec4(1, 0, 1, 1), ShaderID);
     shape ViewFrustum = CreateFrustum(DebugCamera.Frustum);
     RenderShape(&ViewFrustum);
+
     glEnable(GL_CULL_FACE);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -353,11 +401,9 @@ bloom_properties SetupBloom()
 
     // configure (floating point) framebuffers
     // ---------------------------------------
+    Bloom.FBO = CreateFBO();
 
-    glGenFramebuffers(1, &Bloom.FBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, Bloom.FBO);
     // create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
-
     glGenTextures(2, Bloom.colorBuffers);
     for (unsigned int i = 0; i < 2; i++)
     {
@@ -365,25 +411,25 @@ bloom_properties SetupBloom()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         // attach texture to framebuffer
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, Bloom.colorBuffers[i], 0);
     }
     // create and attach depth buffer (renderbuffer)
 
-    glGenRenderbuffers(1, &Bloom.rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, Bloom.rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, Bloom.rboDepth);
+    Bloom.rboDepth = DepthBufferAttachment(WIDTH, HEIGHT);
+
     // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
     u32 attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, attachments);
-    // finally check if framebuffer is complete
+
+    // finally check if framebuffer is complete;
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        ;
-    std::cout << "Framebuffer not complete!" << std::endl;
+    {
+        std::cout << "BloomFBO not complete!" << std::endl;
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // ping-pong-framebuffer for blurring
@@ -413,10 +459,12 @@ bloom_properties SetupBloom()
     SetTextUniform("scene", 0, Bloom.BloomShader);
     SetTextUniform("bloomBlur", 1, Bloom.BloomShader);
 
+    Bloom.Quad = CreateQuad();
+
     return Bloom;
 }
 
-void RenderBloom(shape *Quad)
+void RenderBloom()
 {
 #if 1
     // 2. blur bright fragments with two-pass Gaussian Blur
@@ -436,7 +484,7 @@ void RenderBloom(shape *Quad)
         glBindTexture(GL_TEXTURE_2D,
                       first_iteration ? Bloom.colorBuffers[1] : Bloom.pingpongColorbuffers[!horizontal]);
         // bind texture of other framebuffer (or scene if first iteration)
-        RenderShape(Quad);
+        RenderShape(&Bloom.Quad);
 
         horizontal = !horizontal;
         if (first_iteration)
@@ -462,5 +510,160 @@ void RenderBloom(shape *Quad)
     SetIntUniform("bloom", Bloom.Enable, Bloom.BloomShader);
     SetFloatUniform("exposure", Bloom.exposure, Bloom.BloomShader);
 
-    RenderShape(Quad);
+    RenderShape(&Bloom.Quad);
 }
+
+void RenderSkybox(cubemap &Cubemap, mat4 &view, vec4 &ClipPlane)
+{
+    glDepthFunc(GL_LEQUAL);
+    glUseProgram(Cubemap.ShaderID);
+
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (r32) WIDTH / HEIGHT, 0.1f, 100.0f);
+    SetMat4Uniform("view", view, Cubemap.ShaderID);
+    SetMat4Uniform("projection", projection, Cubemap.ShaderID);
+
+    SetVec4Uniform("clip_plane", ClipPlane, Cubemap.ShaderID);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, Cubemap.Texture);
+    RenderShape(&Cubemap.Cube);
+
+    glDepthFunc(GL_LESS);
+}
+
+cubemap CreateCubemap()
+{
+    cubemap Cubemap  = {};
+    Cubemap.ShaderID = CreateShaders("../shaders/skybox.vert", "../shaders/skybox.frag");
+    Cubemap.Cube     = createBox(1, 1, 1);
+
+    glUseProgram(Cubemap.ShaderID);
+    glUniform1i(glGetUniformLocation(Cubemap.ShaderID, "skybox"), 0);
+    glGenTextures(1, &Cubemap.Texture);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, Cubemap.Texture);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    std::string images[6] =
+    {
+    "../../models/skybox3/right.jpg",
+    "../../models/skybox3/left.jpg",
+    "../../models/skybox3/top.jpg",
+    "../../models/skybox3/bottom.jpg",
+    "../../models/skybox3/front.jpg",
+    "../../models/skybox3/back.jpg",
+    };
+
+    stbi_set_flip_vertically_on_load(false);
+    for (u8 i = 0; i < 6; ++i)
+    {
+        int            imgWidth, imgHeight, numColCh;
+        unsigned char *bytes = stbi_load(images[i].c_str(), &imgWidth, &imgHeight, &numColCh, 0);
+
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                     0,
+                     GL_RGB,
+                     imgWidth, imgHeight,
+                     0,
+                     GL_RGB,
+                     GL_UNSIGNED_BYTE,
+                     bytes);
+        stbi_image_free(bytes);
+    }
+
+    return Cubemap;
+}
+
+void RenderWater(mat4 &Projection, mat4 &View, water &Water, vec3 &CamPos, r32 &dt)
+{
+    glUseProgram(Water.Shader);
+    SetMat4Uniform("Projection", Projection, Water.Shader);
+    SetMat4Uniform("View", View, Water.Shader);
+    SetMat4Uniform("Model", Water.Tranformation, Water.Shader);
+
+    Water.MoveFactor += 0.05f * dt;
+    if (Water.MoveFactor > 1.f) { Water.MoveFactor = 0; }
+
+    SetFloatUniform("MoveFactor", Water.MoveFactor, Water.Shader);
+    SetVec3Uniform("CameraPos", CamPos, Water.Shader);
+
+    SetVec3Uniform("LightPos", LightPos, Water.Shader);
+    SetVec4Uniform("LightColor", LightColor, Water.Shader);
+
+    BindTexture(Water.Reflection);
+    BindTexture(Water.Refraction);
+    BindTexture(Water.DUDV);
+    BindTexture(Water.Normal);
+    BindTexture(Water.DepthMap);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    RenderShape(&Water.Quad);
+    glDisable(GL_BLEND);
+}
+
+water CreateWater()
+{
+    water Water      = {};
+    Water.Shader     = CreateShaders("../shaders/water/water.vert", "../shaders/water/water.frag");
+    Water.MoveFactor = 0.f;
+    Water.Quad       = CreateQuad();
+
+    Water.ReflectHeight = HEIGHT / 1;
+    Water.ReflectWidth  = WIDTH / 1;
+
+    Water.RefractHeight = HEIGHT / 1;
+    Water.RefractWidth  = WIDTH / 1;
+
+    //-------------------Textures----------------------
+    // clang-format off
+    Water.Reflection = {"ReflectionTex", 0};
+    Water.Refraction = {"RefractionTex", 1};
+    Water.DUDV       = {"DUDV_Map",      2};
+    Water.Normal     = {"NormalMap",     3};
+    Water.DepthMap   = {"DepthMap",      4};
+
+    LoadTexture("../../models/water/DUDV.png", &Water.DUDV);
+    LoadTexture("../../models/water/normal.png", &Water.Normal);
+
+    SetTextureUniform(Water.Reflection, Water.Shader);
+    SetTextureUniform(Water.Refraction, Water.Shader);
+    SetTextureUniform(Water.DUDV,       Water.Shader);
+    SetTextureUniform(Water.Normal,     Water.Shader);
+    SetTextureUniform(Water.DepthMap,   Water.Shader);
+    // clang-format on
+
+    //-------------------FBOs----------------------
+    // ----------Reflection---------------
+    Water.ReflectFBO    = CreateFBO();
+    Water.Reflection.ID = ColorTextureAttachment(Water.ReflectWidth, Water.ReflectHeight);
+    DepthBufferAttachment(Water.ReflectWidth, Water.ReflectHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // -----------Refraction--------------
+    Water.RefractFBO    = CreateFBO();
+    Water.Refraction.ID = ColorTextureAttachment(Water.RefractWidth, Water.RefractHeight);
+    Water.DepthMap.ID   = DepthTextureAttachment(Water.RefractWidth, Water.RefractHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    //----------------Transformations----------------------
+
+    vec3 WaterTranslate = vec3(546, -255, 717);
+    vec3 WaterRotate    = vec3(30, 270, 0);
+    vec3 WaterScale     = vec3(285, 500, 1);
+
+    Water.Height = WaterTranslate.y;
+
+    mat4 WaterMatrix = mat4(1);
+    WaterMatrix      = translate(WaterMatrix, WaterTranslate);
+    WaterMatrix      = rotate(WaterMatrix, radians(WaterRotate.x), vec3(0, 1, 0));
+    WaterMatrix      = rotate(WaterMatrix, radians(WaterRotate.y), vec3(1, 0, 0));
+    WaterMatrix      = scale(WaterMatrix, WaterScale);
+
+    Water.Tranformation = WaterMatrix;
+
+    return Water;
+};

@@ -40,5 +40,3 @@ camera InitCamera(vec3 Position);
 
 mat4 GetViewMatrix(camera *Camera);
 
-void UpdateCamera(camera *Camera);
-

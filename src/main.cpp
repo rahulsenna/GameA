@@ -36,7 +36,7 @@ int main()
     GLFWmonitor *monitor = glfwGetWindowMonitor(Window);
     // glfwSetWindowMonitor(window, monitor, 0, 0, 2560, 1440, 240);
     // glfwSetWindowSize(Window, 2560, 1440);
-    glfwSetWindowSize(Window, WIDTH, HEIGHT);
+    glfwSetWindowSize(Window, 2560, HEIGHT);
 
     glfwSetWindowPos(Window, 5, 70);
 
@@ -46,7 +46,7 @@ int main()
     int       NumColCh;
     stbi_set_flip_vertically_on_load(true);
 
-    char *IconFile = "C:/Users/AgentOfChaos/Desktop/models/textures/right.png";
+    char *IconFile = "../../models/textures/right.png";
     Icon.pixels    = stbi_load(IconFile, &Icon.width, &Icon.height, &NumColCh, 0);
 
     glfwSetWindowIcon(Window, 1, &Icon);

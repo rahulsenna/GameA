@@ -4,6 +4,9 @@ CompileFlags:                     # Tweak the parse settings
 
 Diagnostics:
   UnusedIncludes: Strict
+  ClangTidy:
+    Add: []
+    Remove: [bugprone-easily-swappable-parameters]
 
 #InlayHints:
 #  Enabled: Yes

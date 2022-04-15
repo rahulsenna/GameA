@@ -12,3 +12,4 @@
 
 void HandleKeyInputs(camera *Camera, GLFWwindow *Window, r32 dt);
 void HandleMouseInputs(camera *Camera, GLFWwindow *Window);
+void UpdateCamera(camera *Camera);

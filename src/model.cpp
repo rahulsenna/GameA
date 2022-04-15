@@ -4,6 +4,7 @@
 
 #include "model.h"
 #include "mesh.h"
+#include <setjmp.h>
 
 // #define FAST_MODEL
 
@@ -111,7 +112,7 @@ LoadMaterials(model *model, const aiScene *scene, aiMaterial *material, aiTextur
         {
             texture tex = {};
             tex.type    = typeName;
-            tex.unit    = model->loadedTex.size()+1;
+            tex.unit    = model->loadedTex.size() + 1;
 
             if (auto texture = scene->GetEmbeddedTexture(texPath.C_Str()))
             {
@@ -189,10 +190,9 @@ processMesh(model *model, aiMesh *mesh, const aiScene *scene, u32 meshCount)
 #endif
     }
 
-
 #ifndef FAST_MODEL
     std::vector<Vertex> vertices;
-    std::vector<u32> indices;
+    std::vector<u32>    indices;
     for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
     {
         Vertex vertex = {};
@@ -316,13 +316,13 @@ void processNode(model *model, aiNode *node, const aiScene *scene, u32 count)
     }
 }
 
-model AssimpLoadModel(const char *pFile)
+model AssimpLoadModel(const char *File)
 {
     const aiScene *scene = 0;
-    scene                = aiImportFile(pFile,
-    // aiProcess_GenSmoothNormals |
-    // aiProcess_FlipUVs |
-    // aiProcess_JoinIdenticalVertices |
+    scene                = aiImportFile(File,
+                                        // aiProcess_GenSmoothNormals |
+                                        // aiProcess_FlipUVs |
+                                        // aiProcess_JoinIdenticalVertices |
                                         aiProcess_CalcTangentSpace |
                                         aiProcess_Triangulate);
 
@@ -332,37 +332,36 @@ model AssimpLoadModel(const char *pFile)
         printf("assimp load error %s\n", aiGetErrorString());
     }
 
-    model model = {};
-    model.file  = pFile;
+    model Model = {};
+    Model.file  = File;
 
-    cout << pFile << endl;
+    cout << File << endl;
 
-    model.transform = ConvertMatrixToGLMFormat(scene->mRootNode->mTransformation);
+    Model.transform = ConvertMatrixToGLMFormat(scene->mRootNode->mTransformation);
 
     if (!scene->mRootNode->mTransformation.IsIdentity())
     {
         aiVector3D position, scaling, rotation;
 
         scene->mRootNode->mTransformation.Decompose(scaling, rotation, position);
-        model.rotation = glmV3fromAiV3(rotation);
-        model.scaling  = glmV3fromAiV3(scaling);
-        model.position = glmV3fromAiV3(position);
+        Model.rotation = glmV3fromAiV3(rotation);
+        Model.scaling  = glmV3fromAiV3(scaling);
+        Model.position = glmV3fromAiV3(position);
 
         // cout << "--------" << pFile << "---------" << endl;
-        cout << "rotation: " << glm::to_string(model.rotation) << endl;
-        cout << "scaling: " << glm::to_string(model.scaling) << endl;
-        cout << "position: " << glm::to_string(model.position) << endl;
+        cout << "rotation: " << glm::to_string(Model.rotation) << endl;
+        cout << "scaling: " << glm::to_string(Model.scaling) << endl;
+        cout << "position: " << glm::to_string(Model.position) << endl;
     }
 
     // Now we can access the file's contents
 
-    processNode(&model, scene->mRootNode, scene, 0);
-
+    processNode(&Model, scene->mRootNode, scene, 0);
 
     // We're done. Release all resources associated with this import
     aiReleaseImport(scene);
 
-    return model;
+    return Model;
 }
 
 void DrawModel(model *model, u32 shader)

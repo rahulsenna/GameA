@@ -79,10 +79,10 @@ CreateShaders(const char *vertexFile, const char *fragmentFile, const char *geom
     unsigned int geometryShader;
     if (geometryPath != nullptr)
     {
-        std::string geometryCode = get_file_contents(geometryPath);
+        std::string geometryCode   = get_file_contents(geometryPath);
         const char *geometrySource = geometryCode.c_str();
-        
-        geometryShader          = glCreateShader(GL_GEOMETRY_SHADER);
+
+        geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
         glShaderSource(geometryShader, 1, &geometrySource, NULL);
         glCompileShader(geometryShader);
         compileErrors(geometryShader, "GEOMETRY");
@@ -168,9 +168,17 @@ SetVec4Uniform(const char *Name, r32 x, r32 y, r32 z, r32 w, u32 ShaderID)
 inline void
 SetTextUniform(const char *Name, s32 unit, u32 shaderProgram)
 {
-    s32 texUniform = glGetUniformLocation(shaderProgram, Name);
     glUseProgram(shaderProgram);
+    s32 texUniform = glGetUniformLocation(shaderProgram, Name);
     glUniform1i(texUniform, unit);
+}
+
+inline void
+SetTextureUniform(texture &Texture, u32 &shaderProgram)
+{
+    glUseProgram(shaderProgram);
+    s32 texUniform = glGetUniformLocation(shaderProgram, Texture.type);
+    glUniform1i(texUniform, Texture.unit);
 }
 
 inline void
@@ -241,6 +249,53 @@ createVAO()
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     return VAO;
+}
+
+inline u32 CreateFBO()
+{
+    u32 FBO;
+    glGenFramebuffers(1, &FBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+    return FBO;
+}
+inline u32 DepthBufferAttachment(s32 Width, s32 Height)
+
+{
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Width, Height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    return rbo;
+}
+
+inline u32 DepthTextureAttachment(s32 Width, s32 Height)
+{
+    u32 Texture;
+    glGenTextures(1, &Texture);
+    glBindTexture(GL_TEXTURE_2D, Texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, Width, Height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Texture, 0);
+
+    return Texture;
+}
+
+inline u32 ColorTextureAttachment(s32 Width, s32 Height, GLenum Type = GL_UNSIGNED_BYTE)
+{
+    u32 Texture;
+    glGenTextures(1, &Texture);
+    glBindTexture(GL_TEXTURE_2D, Texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_RGB, Type, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Texture, 0);
+
+    return Texture;
 }
 
 inline void
@@ -331,8 +386,8 @@ LoadTexture(const char *filename, texture *texture)
 }
 
 inline void
-bindTexture(texture *texture)
+BindTexture(texture &Texture)
 {
-    glActiveTexture(GL_TEXTURE0 + texture->unit);
-    glBindTexture(GL_TEXTURE_2D, texture->ID);
+    glActiveTexture(GL_TEXTURE0 + Texture.unit);
+    glBindTexture(GL_TEXTURE_2D, Texture.ID);
 }

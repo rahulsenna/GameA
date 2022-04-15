@@ -18,10 +18,16 @@ uniform mat4 view;
 uniform mat4 model;
 uniform mat4 lightSpaceMatrix;
 
+// const vec4 clip_plane = vec4(0,-1,0, -8);
+uniform vec4 clip_plane;
+
 void main()
 {
+    vec4 FragPos = model * vec4(aPos, 1.0);
 
-    vs_out.FragPos = vec3(model * vec4(aPos, 1.0));
+    gl_ClipDistance[0] = dot(FragPos, clip_plane);
+
+    vs_out.FragPos = FragPos.xyz;
     vs_out.Normal = transpose(inverse(mat3(model))) * aNormal;
     vs_out.TexCoords = aTexCoords;
     vs_out.FragPosLightSpace = lightSpaceMatrix * vec4(vs_out.FragPos, 1.0);

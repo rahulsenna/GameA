@@ -12,6 +12,8 @@ struct shape
     u32 numIndices;
 };
 
+shape CreateQuad();
+
 shape createBox(float w, float h, float l);
 
 shape createPlane(float base, float size, float uvScale);

@@ -34,6 +34,8 @@ const int MAX_BONES = 200;
 const int MAX_BONE_INFLUENCE = 4;
 uniform mat4 finalBonesTransformations[MAX_BONES];
 
+uniform vec4 clip_plane;
+
 
 void main()
 {
@@ -53,6 +55,9 @@ void main()
    }
     vec4 crntPosV4 = vec4(model * totalPosition);
     // vec4 crntPosV4 = vec4(model * vec4(aPos,1.0f));
+    
+    gl_ClipDistance[0] = dot(crntPosV4, clip_plane);
+
     
     FragPos = crntPosV4.xyz;
     Normal = transpose(inverse(mat3(model))) * aNormal;

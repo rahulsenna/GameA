@@ -21,9 +21,8 @@ typedef bool    b32;
 typedef float  r32;
 typedef double r64;
 
-#define WIDTH  (1920 / 1)
-#define HEIGHT (1080 / 1)
-
+const s32 WIDTH  = (1920 / 1);
+const s32 HEIGHT = (1080 / 1);
 
 #define FACE_CULLING
 

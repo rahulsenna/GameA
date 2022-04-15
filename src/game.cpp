@@ -42,23 +42,25 @@ debug_camera DebugCamera;
 
 ImGuiIO *ImGuiIo = nullptr;
 
-shape CreateQuad();
-
-shape Quad;
-
 void AddContent();
 
 bloom_properties Bloom;
 
-void InitGame(GLFWwindow *Window)
+water Water;
+
+cubemap Skybox;
+void    InitGame(GLFWwindow *Window)
 {
+    Skybox = CreateCubemap();
     Camera = InitCamera(glm::vec3(0, 2, 4));
 
     DebugCamera.Enable          = false;
-    DebugCamera.EnableShadowBox = true;
-    DebugCamera.Pos             = vec3(500, 200, -100);
-    DebugCamera.Rot             = vec2(0);
-    DebugCamera.Zoom            = 1;
+    DebugCamera.EnableShadowBox = false;
+    // DebugCamera.Pos             = vec3(500, 200, -100);
+    DebugCamera.Pos = vec3(-217, 32, -358);
+
+    DebugCamera.Rot  = vec2(0);
+    DebugCamera.Zoom = 1;
 
     DebugCamera.Sun = createSphere(2, 32, 32);
 
@@ -72,13 +74,16 @@ void InitGame(GLFWwindow *Window)
 
     AddContent();
 
-    Quad = CreateQuad();
-    // Bloom
-
     Bloom = SetupBloom();
+
+    // -----------------------------Water-------------------------------------------
+
+    Water = CreateWater();
+
+    MainCCT->setPosition(PxExtendedVec3(280, -140, 147));
 }
 
-b32 PhysXDebug = true;
+b32 PhysXDebug = false;
 
 // timing
 r32 dt        = 0.0f;
@@ -90,26 +95,32 @@ r32 AlphaEpsi    = 0.f;
 r32 ScalePlayer  = 1;
 
 vec4 LightColor = vec4(1.f);
-vec3 LightPos   = vec3(0.5f, 2, 2) * 30.f;
+vec3 LightPos   = vec3(1, 1, .7) * 1000.f;
 
 extern r32 FOV;
 
 r32 AspectRatio = (r32) WIDTH / (r32) HEIGHT;
 
-r32 farPlane               = 10000.f;
-r32 PercentageCloserFilter = 0.0009f;
-r32 ShadowFarDist          = 200;
+r32 FarPlane  = 10000.f;
+r32 NearPlane = 0.1f;
 
-void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View);
+r32 PercentageCloserFilter = 0.0009f;
+
+void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View, vec4 &ClipPlane);
+
+mat4 GetReflectionMatrix(camera &Camera);
+void RenderScene(u32 FBO, s32 Width, s32 Height,
+                 mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View, mat4 &SkyView, vec4 ClipPlane = vec4(1.f));
 
 void UpdateAndRender(GLFWwindow *Window)
 {
-    r32 CurrentFrame = glfwGetTime();
+    // ------------------------------Timing------------------------------------
+    r32 CurrentFrame = (r32) glfwGetTime();
     dt               = CurrentFrame - LastFrame;
     LastFrame        = CurrentFrame;
 
     StepPhysics(dt);
-
+    // ------------------------------Input-------------------------------------
     if (!ImGuiIo->WantCaptureMouse)
     {
         HandleMouseInputs(&Camera, Window);
@@ -117,6 +128,7 @@ void UpdateAndRender(GLFWwindow *Window)
     HandleKeyInputs(&Camera, Window, dt);
     UpdateCamera(&Camera);
 
+    // --------------------------Animated Tranformation------------------------
     for (u32 I = 0; I < DynamicModelRenderGroup.Models.size(); ++I)
     {
 
@@ -131,52 +143,58 @@ void UpdateAndRender(GLFWwindow *Window)
         DynamicModelRenderGroup.AnimTransforms[I] = AnimManager->animator.FinalBoneMatrices;
     }
 
+    // ---------------------------Shadow Mapping--------------------------------------
     mat4 LightSpaceMatrix = CalculateLightSpaceMatrix(&Camera);
-
     RenderPassShadow(LightSpaceMatrix, ShapeRenderGroup, DynamicModelRenderGroup, ShadowMap);
 
-    //------------------------------------------------
+    //-----------------------------Clip Space----------------------------------------
+    mat4 Projection = perspective(FOV, AspectRatio, NearPlane, FarPlane);
+    mat4 View       = lookAt(Camera.ThirdPCamPos, Camera.LookAt, Camera.Up);
+    mat4 SkyView    = mat4(mat3(View));// Removing translation component from transformation matrix
+
+    //---------------------------Water Refraction------------------------------------
+    {
+
+        glEnable(GL_CLIP_DISTANCE0);
+        vec4 ClipPlane = vec4(0, -1, 0, Water.Height);
+        RenderScene(Water.RefractFBO, Water.RefractWidth, Water.RefractHeight,
+                    LightSpaceMatrix, Projection, View, SkyView, ClipPlane);
+    }
+    //---------------------------Water Reflection------------------------------------
+    {
+        vec4 ClipPlane         = vec4(0, 1, 0, -Water.Height);
+        mat4 ReflectionView    = GetReflectionMatrix(Camera);
+        mat4 ReflectionSkyView = mat4(mat3(ReflectionView));
+
+        RenderScene(Water.ReflectFBO, Water.ReflectWidth, Water.ReflectHeight,
+                    LightSpaceMatrix, Projection, ReflectionView, ReflectionSkyView, ClipPlane);
+    }
+
+#if 0
+        if (Bloom.Enable)
+        {
+            glDisable(GL_CLIP_DISTANCE0);
+            RenderScene(Bloom.FBO, WIDTH, HEIGHT, LightSpaceMatrix, Projection, View, SkyView);
+            RenderWater(Projection, View, Water, Camera.ThirdPCamPos, dt);
+        } else
+#endif
+    //---------------------------Final RenderPass------------------------------------
+
+    {
+        if (DebugCamera.Enable) { View = DebugViewMatrix(&DebugCamera); }
+
+        glDisable(GL_CLIP_DISTANCE0);
+        RenderScene(0, WIDTH, HEIGHT, LightSpaceMatrix, Projection, View, SkyView);
+        RenderWater(Projection, View, Water, Camera.ThirdPCamPos, dt);
+    }
+
+    // ---------------------------DEBUG RENDER--------------------------------------
+
     if (Bloom.Enable)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, Bloom.FBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-    mat4 Projection = perspective(FOV, AspectRatio, 0.01f, 10000.f);
-    mat4 View       = GetViewMatrix(&Camera);
-
-    if (DebugCamera.Enable)
-    {
-        View = DebugViewMatrix(&DebugCamera);
+        RenderBloom();
     }
 
-    {
-        PrepShader(ShapeRenderGroup.ShaderID, LightSpaceMatrix, Projection, View);
-        RenderShapes(&ShapeRenderGroup, ShapeRenderGroup.ShaderID);
-    }
-
-    {
-        PrepShader(DynamicModelRenderGroup.ShaderID, LightSpaceMatrix, Projection, View);
-        RenderAnimatedModels(&DynamicModelRenderGroup, DynamicModelRenderGroup.ShaderID);
-    }
-
-    {
-        PrepShader(StaticModelRenderGroup.ShaderID, LightSpaceMatrix, Projection, View);
-
-        for (u32 I = 0; I < StaticModelRenderGroup.Models.size(); ++I)
-        {
-            SetMat4Uniform("model", StaticModelRenderGroup.Transforms[I], StaticModelRenderGroup.ShaderID);
-            DrawModel(&StaticModelRenderGroup.Models[I], StaticModelRenderGroup.ShaderID);
-            if (0)
-            {
-                RenderPhysXMesh(StaticModelRenderGroup.DebugVAO[I], DebugLineShader,
-                                StaticModelRenderGroup.DebugIndicesCount[I],
-                                View, Projection, StaticModelRenderGroup.Transforms[I]);
-            }
-        }
-    }
-
-    // -----------------------------------------------------------------
-    //                   DEBUG RENDER
     RenderSun(DebugLineShader, Projection, View, LightPos);
 
     if (DebugCamera.Enable)
@@ -188,18 +206,14 @@ void UpdateAndRender(GLFWwindow *Window)
         PhysXDebugRender(DebugLineShader, Projection, View);
     }
 
-    if (Bloom.Enable)
-    {
-        RenderBloom(&Quad);
-    }
+    // ---------ImGUI--------------
 
-    // -----------------------
     RenderImGui(dt);
 }
 
 // ------------------------------------------------------
 
-void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View)
+void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View, vec4 &ClipPlane)
 {
     glUseProgram(ShaderID);
 
@@ -218,6 +232,8 @@ void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &V
     SetFloatUniform("specVal", SpecValue, ShaderID);
     SetFloatUniform("alphaEPSI", AlphaEpsi, ShaderID);
 
+    SetVec4Uniform("clip_plane", ClipPlane, ShaderID);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, ShadowMap.DepthMap);
 }
@@ -225,13 +241,13 @@ void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &V
 void AddContent()
 {
     // Objects
-    ShapeRenderGroup.ShaderID       = CreateShaders("../shadow/3.1.3.shadow_mapping.vs", "../shadow/3.1.3.shadow_mapping.fs");
-    ShapeRenderGroup.ShadowShaderID = CreateShaders("../shadow/3.1.3.shadow_mapping_depth.vs", "../shadow/3.1.3.shadow_mapping_depth.fs");
+    ShapeRenderGroup.ShaderID       = CreateShaders("../shaders/shadow/shape.vert", "../shaders/shadow/shape.frag");
+    ShapeRenderGroup.ShadowShaderID = CreateShaders("../shaders/shadow/shadow_map_depth.vert", "../shaders/shadow/shadow_map_depth.frag");
 
     glUseProgram(ShapeRenderGroup.ShaderID);
     SetTextUniform("shadowMap", 0, ShapeRenderGroup.ShaderID);
     texture Texture = {"diffuseTexture", 1};
-    LoadTexture("C:/Users/AgentOfChaos/Desktop/models/textures/checker/512x512 Texel Density Texture 3.png", &Texture);
+    LoadTexture("../../models/textures/checker/512x512 Texel Density Texture 3.png", &Texture);
     SetTextUniform(Texture.type, Texture.unit, ShapeRenderGroup.ShaderID);
 
     {
@@ -320,7 +336,7 @@ void AddContent()
 
     {
         texture PlaneTexture = {"diffuseTexture", 1};
-        LoadTexture("C:/Users/AgentOfChaos/Desktop/models/textures/checker/512x512 Texel Density Texture 1.png", &PlaneTexture);
+        LoadTexture("../../models/textures/checker/512x512 Texel Density Texture 1.png", &PlaneTexture);
         SetTextUniform(PlaneTexture.type, PlaneTexture.unit, ShapeRenderGroup.ShaderID);
 
         ShapeRenderGroup.Shapes.push_back(createPlane(0, 50.f, 2));
@@ -339,23 +355,23 @@ void AddContent()
 
     {
         MainCCT     = CreatePhysXCCT();
-        model Model = AssimpLoadModel("C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/binary.fbx");
+        model Model = AssimpLoadModel("../../meGame/Resource/models/lady/binary.fbx");
         DynamicModelRenderGroup.Models.push_back(Model);
         std::vector<mat4> VectorTransforms;
         DynamicModelRenderGroup.AnimTransforms.push_back(VectorTransforms);
         DynamicModelRenderGroup.Transforms.emplace_back(1.f);
 
         DynamicModelRenderGroup.ShaderID       = CreateShaders("../shaders/anim.vert", "../shaders/anim.frag");
-        DynamicModelRenderGroup.ShadowShaderID = CreateShaders("../shadow/anim_shadow_depth.vs", "../shadow/anim_shadow_depth.fs");
+        DynamicModelRenderGroup.ShadowShaderID = CreateShaders("../shaders/shadow/anim_shadow_map_depth.vert", "../shaders/shadow/anim_shadow_map_depth.frag");
 
         std::map<std::string, AnimationState> AnimFiles;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/idle.fbx"]     = Idle;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/walk.fbx"]     = Walk;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/jog.fbx"]      = Jog;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/run.fbx"]      = Run;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/jump.fbx"]     = Jump;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/falling.fbx"]  = Fall;
-        AnimFiles["C:/Users/AgentOfChaos/Desktop/meGame/Resource/models/lady/walkBack.fbx"] = WalkBack;
+        AnimFiles["../../meGame/Resource/models/lady/idle.fbx"]     = Idle;
+        AnimFiles["../../meGame/Resource/models/lady/walk.fbx"]     = Walk;
+        AnimFiles["../../meGame/Resource/models/lady/jog.fbx"]      = Jog;
+        AnimFiles["../../meGame/Resource/models/lady/run.fbx"]      = Run;
+        AnimFiles["../../meGame/Resource/models/lady/jump.fbx"]     = Jump;
+        AnimFiles["../../meGame/Resource/models/lady/falling.fbx"]  = Fall;
+        AnimFiles["../../meGame/Resource/models/lady/walkBack.fbx"] = WalkBack;
 
         std::map<AnimationState, AnimManager> AnimManager;
 
@@ -375,9 +391,9 @@ void AddContent()
     {
 
         StaticModelRenderGroup.ShaderID       = CreateShaders("../shaders/default.vert", "../shaders/default.frag");
-        StaticModelRenderGroup.ShadowShaderID = CreateShaders("../shadow/3.1.3.shadow_mapping_depth.vs", "../shadow/3.1.3.shadow_mapping_depth.fs");
+        StaticModelRenderGroup.ShadowShaderID = CreateShaders("../shaders/shadow/shadow_map_depth.vert", "../shaders/shadow/shadow_map_depth.frag");
 
-        const char *ModelFile = "C:/Users/AgentOfChaos/Desktop/models/terrain/binary.fbx";
+        const char *ModelFile = "../../models/terrain/binary.fbx";
         model       Model     = AssimpLoadModel(ModelFile);
         StaticModelRenderGroup.Models.push_back(Model);
 
@@ -424,4 +440,40 @@ void AddContent()
         ScenePhysX->addActor(*TerrainStatic);
     }
     // Objects
+}
+
+void RenderScene(u32 FBO, s32 Width, s32 Height,
+                 mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &View, mat4 &SkyView, vec4 ClipPlane)
+{
+    glViewport(0, 0, Width, Height);
+    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    {
+        PrepShader(ShapeRenderGroup.ShaderID, LightSpaceMatrix, Projection, View, ClipPlane);
+        RenderShapes(&ShapeRenderGroup, ShapeRenderGroup.ShaderID);
+    }
+
+    {
+        PrepShader(DynamicModelRenderGroup.ShaderID, LightSpaceMatrix, Projection, View, ClipPlane);
+        RenderAnimatedModels(&DynamicModelRenderGroup, DynamicModelRenderGroup.ShaderID);
+    }
+
+    {
+        PrepShader(StaticModelRenderGroup.ShaderID, LightSpaceMatrix, Projection, View, ClipPlane);
+        RenderStaticModels(&StaticModelRenderGroup);
+    }
+    RenderSkybox(Skybox, SkyView, ClipPlane);
+}
+
+mat4 GetReflectionMatrix(camera &Camera)
+{
+    r32  CamWaterDist  = 2 * (Camera.ThirdPCamPos.y - Water.Height);
+    vec3 ReflactCamPos = Camera.ThirdPCamPos - vec3(0, CamWaterDist, 0);
+
+    vec3 Front = vec3(Camera.Front.x, -Camera.Front.y, Camera.Front.z);
+
+    mat4 ReflectionView = lookAt(ReflactCamPos, ReflactCamPos + Front, Camera.Up);
+
+    return ReflectionView;
 }

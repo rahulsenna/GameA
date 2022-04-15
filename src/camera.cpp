@@ -2,15 +2,16 @@
 // Created by AgentOfChaos on 4/5/2022.
 //
 
-
 #include "camera.h"
 
 // Default camera values
-const r32 YAW         = -90.0f + 0.f;
+// const r32 YAW         = -90.0f + 0.f;
+const r32 YAW = 90.0f + 0.f;
+
 const r32 PITCH       = -30.0f + 27.f;
 const r32 SPEED       = 20.5f;
 const r32 SENSITIVITY = 0.1f;
-r32       FOV         = 45.0f;
+r32       FOV         = radians(70.0f);
 
 mat4 GetViewMatrix(camera *Camera)
 {
@@ -21,7 +22,7 @@ mat4 GetViewMatrix(camera *Camera)
 camera
 InitCamera(vec3 Position)
 {
-    camera camera = {};
+    camera camera   = {};
     camera.Position = Position;
     camera.Front    = vec3(0.f, 0.f, -1.f);
 
@@ -40,5 +41,3 @@ InitCamera(vec3 Position)
 
     return (camera);
 }
-
-
