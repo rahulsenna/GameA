@@ -13,19 +13,19 @@ using namespace physx;
 struct ControlledActorDesc
 {
 
-    PxControllerShapeType::Enum  Type;
-    PxExtendedVec3               Position;
-    float                        SlopeLimit;
-    float                        ContactOffset;
-    float                        StepOffset;
-    float                        InvisibleWallHeight;
-    float                        MaxJumpHeight;
-    float                        Radius;
-    float                        Height;
-    float                        CrouchHeight;
-    float                        ProxyDensity;
-    float                        ProxyScale;
-    float                        VolumeGrowth;
+    PxControllerShapeType::Enum   Type;
+    PxExtendedVec3                Position;
+    float                         SlopeLimit;
+    float                         ContactOffset;
+    float                         StepOffset;
+    float                         InvisibleWallHeight;
+    float                         MaxJumpHeight;
+    float                         Radius;
+    float                         Height;
+    float                         CrouchHeight;
+    float                         ProxyDensity;
+    float                         ProxyScale;
+    float                         VolumeGrowth;
     PxUserControllerHitReport    *ReportCallback;
     PxControllerBehaviorCallback *BehaviorCallback;
 };
@@ -33,7 +33,7 @@ struct ControlledActorDesc
 struct physx_actor_entity
 {
     PxRigidActor *actorPtr;
-    PxU32        actorId;
+    PxU32         actorId;
 };
 
 struct physics_engine
@@ -44,6 +44,12 @@ struct physics_engine
     PxDefaultCpuDispatcher *Dispatcher;
     PxScene                *Scene;
     PxPvd                  *Pvd;
+};
+
+struct raycast_info
+{
+    b32  DidHit;
+    vec3 Position;
 };
 
 void InitPhysics();
@@ -66,12 +72,17 @@ class HitReportClass : public PxUserControllerHitReport
     {}
 };
 
-inline vec3 V3PxVec3(const PxExtendedVec3 &vec)
+inline vec3 fromPxExtVec3(const PxExtendedVec3 &vec)
 {
     return {vec.x, vec.y, vec.z};
 }
 
-inline vec3 V3PxVec3(const PxVec3 &vec)
+inline vec3 fromPxVec3(const PxVec3 &vec)
+{
+    return {vec.x, vec.y, vec.z};
+}
+
+inline PxVec3 toPxVec3(const vec3 &vec)
 {
     return {vec.x, vec.y, vec.z};
 }
@@ -95,6 +106,4 @@ PxTriangleMesh *createBV34TriangleMesh(const char *Filename,
                                        bool skipMeshCleanup, bool skipEdgeData,
                                        bool inserted, const PxU32 numTrisPerLeaf);
 
-
-
-
+raycast_info RayCast(PxGeometry &geometry, PxTransform transform, PxVec3 origin, PxVec3 direction, PxReal distance);

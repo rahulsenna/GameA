@@ -4,6 +4,7 @@
 
 #include "game.h"
 
+#include "glm/gtx/string_cast.hpp"
 #include "shader.h"
 #include "basic_shapes.h"
 #include "camera.h"
@@ -17,6 +18,9 @@
 
 camera Camera;
 player Player = {};
+
+PxTransform            PhysXTerrainTransform;
+PxTriangleMeshGeometry PhysXTriangleGeom;
 
 // Extern Variables
 extern PxFoundation           *FoundationPhysX;
@@ -92,7 +96,6 @@ r32 LastFrame = 0.0f;
 r32 AmbientValue = 0.5f;
 r32 SpecValue    = 0.3f;
 r32 AlphaEpsi    = 0.f;
-r32 ScalePlayer  = 1;
 
 vec4 LightColor = vec4(1.f);
 vec3 LightPos   = vec3(1, 1, .7) * 1000.f;
@@ -133,10 +136,10 @@ void UpdateAndRender(GLFWwindow *Window)
     {
 
         DynamicModelRenderGroup.Transforms[I] = mat4(1.0f);
-        DynamicModelRenderGroup.Transforms[I] = translate(DynamicModelRenderGroup.Transforms[I], V3PxVec3(MainCCT->getFootPosition()));
+        DynamicModelRenderGroup.Transforms[I] = translate(DynamicModelRenderGroup.Transforms[I], fromPxExtVec3(MainCCT->getFootPosition()));
         DynamicModelRenderGroup.Transforms[I] = rotate(DynamicModelRenderGroup.Transforms[I], radians(180.f), vec3(0.f, 1.f, 0.f));
         DynamicModelRenderGroup.Transforms[I] = rotate(DynamicModelRenderGroup.Transforms[I], radians(Player.RotateX), vec3(0.f, 1.f, 0.f));
-        DynamicModelRenderGroup.Transforms[I] = scale(DynamicModelRenderGroup.Transforms[I], vec3(ScalePlayer));
+        DynamicModelRenderGroup.Transforms[I] = scale(DynamicModelRenderGroup.Transforms[I], vec3(DynamicModelRenderGroup.Scale[I]));
 
         AnimManager *AnimManager = &DynamicModelRenderGroup.AnimManager[I][Player.AnimState];
         CrossFadeAnimation(&Player, &AnimManager->animator, &AnimManager->animation, dt);
@@ -149,7 +152,7 @@ void UpdateAndRender(GLFWwindow *Window)
 
     //-----------------------------Clip Space----------------------------------------
     mat4 Projection = perspective(FOV, AspectRatio, NearPlane, FarPlane);
-    mat4 View       = lookAt(Camera.ThirdPCamPos, Camera.LookAt, Camera.Up);
+    mat4 View       = lookAt(Camera.Position, Camera.LookAt, Camera.Up);
     mat4 SkyView    = mat4(mat3(View));// Removing translation component from transformation matrix
 
     //---------------------------Water Refraction------------------------------------
@@ -185,7 +188,7 @@ void UpdateAndRender(GLFWwindow *Window)
 
         glDisable(GL_CLIP_DISTANCE0);
         RenderScene(0, WIDTH, HEIGHT, LightSpaceMatrix, Projection, View, SkyView);
-        RenderWater(Projection, View, Water, Camera.ThirdPCamPos, dt);
+        RenderWater(Projection, View, Water, Camera.Position, dt);
     }
 
     // ---------------------------DEBUG RENDER--------------------------------------
@@ -220,7 +223,7 @@ void PrepShader(u32 &ShaderID, mat4 &LightSpaceMatrix, mat4 &Projection, mat4 &V
     SetMat4Uniform("projection", Projection, ShaderID);
     SetMat4Uniform("view", View, ShaderID);
 
-    SetVec3Uniform("viewPos", Camera.ThirdPCamPos, ShaderID);
+    SetVec3Uniform("viewPos", Camera.Position, ShaderID);
     SetVec3Uniform("lightPos", LightPos, ShaderID);
     SetVec4Uniform("lightColor", LightColor, ShaderID);
 
@@ -350,8 +353,6 @@ void AddContent()
 
         ScenePhysX->addActor(*groundPlane);
     }
-    // 0.933, 0.949, 0.960 lightGray
-    //    0.172, 0.223, 0.254  gray
 
     {
         MainCCT     = CreatePhysXCCT();
@@ -360,6 +361,7 @@ void AddContent()
         std::vector<mat4> VectorTransforms;
         DynamicModelRenderGroup.AnimTransforms.push_back(VectorTransforms);
         DynamicModelRenderGroup.Transforms.emplace_back(1.f);
+        DynamicModelRenderGroup.Scale.emplace_back(1.f);
 
         DynamicModelRenderGroup.ShaderID       = CreateShaders("../shaders/anim.vert", "../shaders/anim.frag");
         DynamicModelRenderGroup.ShadowShaderID = CreateShaders("../shaders/shadow/anim_shadow_map_depth.vert", "../shaders/shadow/anim_shadow_map_depth.frag");
@@ -426,12 +428,12 @@ void AddContent()
         StaticModelRenderGroup.DebugVAO.push_back(DebugVAO);
         StaticModelRenderGroup.DebugIndicesCount.push_back(DebugIndicesCount);
 
-        PxMat44                PhysXTerrainTransform = PxMat44(value_ptr(TerrainTransform));
-        PxTriangleMeshGeometry TriangleGeom          = PxTriangleMeshGeometry(CollisionMesh);
-        TriangleGeom.scale                           = PxMeshScale(ModelScale);
+        PhysXTerrainTransform   = PxTransform(PxMat44(value_ptr(TerrainTransform)));
+        PhysXTriangleGeom       = PxTriangleMeshGeometry(CollisionMesh);
+        PhysXTriangleGeom.scale = PxMeshScale(ModelScale);
 
         PxRigidStatic *TerrainStatic = PxCreateStatic(
-        *PhysXSDK, PxTransform(PhysXTerrainTransform), TriangleGeom, *DefaultMaterialPhysX);
+        *PhysXSDK, PhysXTerrainTransform, PhysXTriangleGeom, *DefaultMaterialPhysX);
 
         PxShape *Shapes;
         TerrainStatic->getShapes(&Shapes, 1);
@@ -468,8 +470,8 @@ void RenderScene(u32 FBO, s32 Width, s32 Height,
 
 mat4 GetReflectionMatrix(camera &Camera)
 {
-    r32  CamWaterDist  = 2 * (Camera.ThirdPCamPos.y - Water.Height);
-    vec3 ReflactCamPos = Camera.ThirdPCamPos - vec3(0, CamWaterDist, 0);
+    r32  CamWaterDist  = 2 * (Camera.Position.y - Water.Height);
+    vec3 ReflactCamPos = Camera.Position - vec3(0, CamWaterDist, 0);
 
     vec3 Front = vec3(Camera.Front.x, -Camera.Front.y, Camera.Front.z);
 

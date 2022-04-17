@@ -14,9 +14,12 @@ out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoords;
 
-out vec3 TangentLightPos;
-out vec3 TangentViewPos;
-out vec3 TangentFragPos;
+out vec3 ViewDir;
+out vec3 LightDir;
+
+// out vec3 TangentLightPos;
+// out vec3 TangentViewPos;
+// out vec3 TangentFragPos;
 
 out vec4 FragPosLightSpace;
 
@@ -54,9 +57,12 @@ void main()
     vec3 B = aBiTangent;
     
     mat3 TBN = transpose(mat3(T, B, N));    
-    TangentLightPos = TBN * lightPos;
-    TangentViewPos  = TBN * viewPos;
-    TangentFragPos  = TBN * FragPos;
+    vec3 TangentLightPos = TBN * lightPos;
+    vec3 TangentViewPos  = TBN * viewPos;
+    vec3 TangentFragPos  = TBN * FragPos;
+
+    ViewDir = normalize(TangentViewPos - TangentFragPos);
+    LightDir = normalize(TangentLightPos - TangentFragPos);
 
 	FragPosLightSpace = lightSpaceMatrix * vec4(FragPos, 1.0);	
 	

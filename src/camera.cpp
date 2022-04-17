@@ -15,7 +15,7 @@ r32       FOV         = radians(70.0f);
 
 mat4 GetViewMatrix(camera *Camera)
 {
-    return glm::lookAt(Camera->ThirdPCamPos, Camera->LookAt, Camera->Up);
+    return glm::lookAt(Camera->Position, Camera->LookAt, Camera->Up);
     // return glm::lookAt(camera->tpCamPos, camera->LookAt, camera->WorldUp);
 };
 

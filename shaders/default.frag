@@ -8,9 +8,12 @@ in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoords;
 
-in vec3 TangentLightPos;
-in vec3 TangentViewPos;
-in vec3 TangentFragPos;
+in vec3 ViewDir;
+in vec3 LightDir;
+
+// in vec3 TangentLightPos;
+// in vec3 TangentViewPos;
+// in vec3 TangentFragPos;
 
 in vec4 FragPosLightSpace;
 
@@ -45,8 +48,8 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     float currentDepth = projCoords.z;
     // calculate bias (based on depth map resolution and slope)
     vec3 normal = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
-    float bias = max(pcf * (1.0 - dot(normal, lightDir)), pcf);
+    vec3 LightDir = normalize(lightPos - FragPos);
+    float bias = max(pcf * (1.0 - dot(normal, LightDir)), pcf);
     // check whether current frag pos is in shadow
     float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
     // PCF
@@ -109,14 +112,14 @@ vec4 direcLight()
 
     vec3 color = colorV4.rgb;
     vec3 ambient = ambientVal * color;
-    vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
+    // vec3 LightDir = normalize(TangentLightPos - TangentFragPos);
 
-    float diff = max(dot(normal, lightDir), 0.0f);
+    float diff = max(dot(normal, LightDir), 0.0f);
     vec3 diffuse = diff * color;
 
-    vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-    vec3 reflectDir = reflect(-lightDir, normal);
-    vec3 halfwayDir = normalize(viewDir + lightDir);
+    // vec3 ViewDir = normalize(TangentViewPos - TangentFragPos);
+    vec3 reflectDir = reflect(-LightDir, normal);
+    vec3 halfwayDir = normalize(ViewDir + LightDir);
 
     float shininess = max((texture(glossy0, TexCoords).r*1080.f), 0.0);
 

@@ -477,3 +477,25 @@ PxTriangleMesh *LoadTriangleMesh(const char *Filename)
     PxTriangleMesh          *triMesh = PhysXSDK->createTriangleMesh(stream);
     return triMesh;
 }
+
+raycast_info RayCast(PxGeometry &geometry, PxTransform transform, PxVec3 origin, PxVec3 direction, PxReal distance)
+{
+
+    PxRaycastHit HitInfo;
+    PxU32        MaxHits  = 1;
+    PxHitFlags   HitFlags = PxHitFlag::ePOSITION;
+    PxU32        HitCount = PxGeometryQuery::raycast(origin, direction,
+                                                     geometry, transform,
+                                                     distance,
+                                                     HitFlags,
+                                                     MaxHits, &HitInfo);
+
+    raycast_info Result = {false};
+
+    if (HitCount > 0)
+    {
+        Result.DidHit   = true;
+        Result.Position = fromPxVec3(HitInfo.position);
+    }
+    return Result;
+}

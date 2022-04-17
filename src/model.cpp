@@ -154,10 +154,8 @@ parse_mesh_bones(aiMesh *mesh)
 static void
 processMesh(model *model, aiMesh *mesh, const aiScene *scene, u32 meshCount)
 {
-    if (scene->HasMaterials())
-    {
-        int val = 3;
-    }
+    // if (scene->HasMaterials())
+
     std::vector<texture> textures;
     if (mesh->mMaterialIndex >= 0)
     {

@@ -19,6 +19,9 @@ r32 LookAtX = 1.f;
 
 extern PxController *MainCCT;
 
+extern PxTransform            PhysXTerrainTransform;
+extern PxTriangleMeshGeometry PhysXTriangleGeom;
+
 void UpdateCamera(camera *Camera)
 {
     r32 t = 0.15f;
@@ -53,8 +56,8 @@ void UpdateCamera(camera *Camera)
 #endif
 
     //    vec3 PlayerPos = Camera->target->Position + AddPlayerCam;
-    vec3 PlayerPos = V3PxVec3(MainCCT->getPosition()) + AddPlayerCam;
-    DistanceOffset = PlayerPos + DistanceOffset;
+    Camera->TargetPos = fromPxExtVec3(MainCCT->getPosition()) + AddPlayerCam;
+    DistanceOffset    = Camera->TargetPos + DistanceOffset;
 
     //    if (Camera->target->AnimState != Fall)
     //    {
@@ -64,16 +67,30 @@ void UpdateCamera(camera *Camera)
     //        distanceOffset.z = PlayerPos.z;
     //    }
     // camera->tpCamPos = glm::mix(camera->tpCamPos+ADDCamPos, distanceOffset, t);
-    Camera->ThirdPCamPos = ADDCamPos + DistanceOffset;
+    Camera->Position = ADDCamPos + DistanceOffset;
 
-    Camera->Front = glm::normalize((PlayerPos - Camera->ThirdPCamPos) * LookAtX);
+    Camera->Front = glm::normalize((Camera->TargetPos - Camera->Position) * LookAtX);
     Camera->Right = glm::normalize(glm::cross(Camera->Front, Camera->WorldUp));
 
     Camera->Up     = glm::normalize(glm::cross(Camera->Right, Camera->Front));
-    Camera->LookAt = PlayerPos + Camera->Front;
+    Camera->LookAt = Camera->TargetPos + Camera->Front;
 
     // camera->Up     = glm::mix(camera->Up, glm::normalize(glm::cross(camera->Right, camera->Front)), t);
     // camera->LookAt = glm::mix(camera->LookAt,  PlayerPos + camera->Front, t);
+
+    // ---------------------------Raycast Collision Detection-----------------------------------------------
+    raycast_info RayCastInfo = RayCast(PhysXTriangleGeom,
+                                       PhysXTerrainTransform,
+                                       toPxVec3(Camera->TargetPos),
+                                       toPxVec3(glm::normalize(-Camera->Front)),
+                                       glm::length(Camera->TargetPos - Camera->Position));
+
+    if (RayCastInfo.DidHit)
+    {
+        Camera->Position = RayCastInfo.Position + Camera->Front * 2.f;
+    }
+
+    // --------------------------------------------------------------------------
 
 #if 0
     if (InputDependent)
@@ -140,10 +157,10 @@ void HandleMouseInputs(camera *Camera, GLFWwindow *Window)
             Camera->FirstClick = false;
         }
 
-        r32 xoffset = mouseX - LastMouseX;
+        r32 xoffset = (r32) mouseX - LastMouseX;
         r32 yoffset = LastMouseY - (r32) mouseY;// reversed since y-coordinates go from bottom to top
 
-        LastMouseX = mouseX;
+        LastMouseX = (r32) mouseX;
         LastMouseY = (r32) mouseY;
 
         if (mouseX > (r32) WIDTH)

@@ -9,7 +9,7 @@
 
 struct camera
 {
-    vec3 Position;
+    vec3 TargetPos;
 
     vec3 Front;
     vec3 Up;
@@ -31,7 +31,7 @@ struct camera
     vec3 DistanceOffset;
 
 //    Player   *target;
-    vec3 ThirdPCamPos;
+    vec3 Position;
 
     // float tYaw;
 };

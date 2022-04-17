@@ -29,10 +29,11 @@ struct render_group_shape
 
 struct dynamic_model_render_group
 {
-    u32                ShaderID;
-    u32                ShadowShaderID;
-    std::vector<model> Models;
+    u32 ShaderID;
+    u32 ShadowShaderID;
 
+    std::vector<r32>                                   Scale;
+    std::vector<model>                                 Models;
     std::vector<mat4>                                  Transforms;
     std::vector<std::vector<mat4>>                     AnimTransforms;
     std::vector<std::map<AnimationState, AnimManager>> AnimManager;
@@ -58,7 +59,6 @@ struct shadow_map
     r32 NearPlane;
 
     vec3 Up;
-
 };
 
 struct debug_camera
