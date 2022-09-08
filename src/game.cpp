@@ -84,7 +84,9 @@ void    InitGame(GLFWwindow *Window)
 
     Water = CreateWater();
 
-    MainCCT->setPosition(PxExtendedVec3(280, -140, 147));
+    // MainCCT->setPosition(PxExtendedVec3(280, -140, 147));
+
+    glEnable(GL_FRAMEBUFFER_SRGB); 
 }
 
 b32 PhysXDebug = false;
@@ -93,7 +95,7 @@ b32 PhysXDebug = false;
 r32 dt        = 0.0f;
 r32 LastFrame = 0.0f;
 
-r32 AmbientValue = 0.5f;
+r32 AmbientValue = 0.15f;
 r32 SpecValue    = 0.3f;
 r32 AlphaEpsi    = 0.f;
 

@@ -83,6 +83,9 @@ void main(void) {
 
 	// FragColor  = vec4(waterDepth5);
 	FragColor = mix(ReflectionColor , RefractionColor, RefractieFactor) + Specular;
+    // float gamma = 2.2;
+    // FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
+
 	// FragColor = mix(FragColor , vec4(0, 0.3, 0.5, 1.0), 0.2); // Greenish Blueish Tint;
 	FragColor.a = waterDepth5;
 

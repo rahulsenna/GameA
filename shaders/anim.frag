@@ -171,5 +171,8 @@ void main()
     // result += direcLight();
     // FragColor = result;
         FragColor = direcLight();
+        float gamma = 2.2;
+        FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
+
 //    FragColor = vec4(texture(diffuse0, texCoord));
 }

@@ -46,7 +46,7 @@ int main()
     int       NumColCh;
     stbi_set_flip_vertically_on_load(true);
 
-    char *IconFile = "../../models/textures/right.png";
+    const char *IconFile = "../../models/textures/right.png";
     Icon.pixels    = stbi_load(IconFile, &Icon.width, &Icon.height, &NumColCh, 0);
 
     glfwSetWindowIcon(Window, 1, &Icon);

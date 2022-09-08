@@ -7,22 +7,34 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_definitions(/D_USE_MATH_DEFINES /DGLEW_STATIC)
 add_compile_options(
-        /MTd
+        -Wno-string-compare
+        # /MTd
         #        /Ox
         #        /diagnostics:caret
 )
 
 add_link_options(
-        /NODEFAULTLIB:LIBCMT
+        # /NODEFAULTLIB:LIBCMT
 )
 
 include_directories(
         ${PROJECT_SOURCE_DIR}/Library/include
-        c:/physx/includes
+        ~/dev/lib/PhysX/physx/include
+        ~/dev/lib/PhysX/pxshared/include
+        ~/dev/lib/PhysX/physx/source/foundation/include
+        ~/dev/lib/assimp/include
+        /usr/local/include
+
 )
 link_directories(
         ${PROJECT_SOURCE_DIR}/Library/lib
-        c:/physx/debug
+        ~/dev/lib/PhysX/physx/bin/linux.clang/release
+        ~/dev/lib/assimp/bin
+
+        /usr/lib
+        /usr/local/lib
+        /usr/local/lib64
+
 )
 
 file(GLOB ImGuiSrc Library/include/imgui/imgui*.cpp)
@@ -37,21 +49,11 @@ add_executable(meGame
 
 
 target_link_libraries(meGame
-                      opengl32.lib
-                      glfw3_mt.lib
-                      glew32s.lib
+        X11
+        GL
 
-                      shell32.lib
-                      assimp-vc142-mt.lib
-
-                      PhysX_64.lib
-                      PhysXFoundation_64.lib
-                      PhysXCommon_64.lib
-                      PhysXCooking_64.lib
-
-                      PhysXExtensions_static_64.lib
-                      PhysXPvdSDK_static_64.lib
-                      PhysXVehicle_static_64.lib
-                      PhysXCharacterKinematic_static_64.lib
-
-                      )
+        libglfw3.a
+        libGLEW.so
+        libassimp.so
+        libphysxrepack.a
+)

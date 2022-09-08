@@ -128,9 +128,9 @@ vec4 direcLight()
     vec3 specular = vec3(specVal) * spec;
     // return vec4(ambient + diffuse + specular, 1.0) * lightColor;
     float shadow = ShadowCalculation(FragPosLightSpace);
-    ambient  *= lightColor;
-    diffuse  *= lightColor;
-    specular *= lightColor;
+    ambient  *= lightColor.rgb;
+    diffuse  *= lightColor.rgb;
+    specular *= lightColor.rgb;
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
     return vec4(lighting, 1.0);
 }
@@ -183,5 +183,8 @@ void main()
 	// outputs final color
 	// float depth = logisticDepth(gl_FragCoord.z, 0.115f, 15.0f);
 	FragColor = direcLight();
-	// FragColor = vec4(1);
+	float gamma = 2.2;
+    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
+
+	// FragColor = vec4(TexCoords.x, TexCoords.y, 1.0, 1.0);
 }
